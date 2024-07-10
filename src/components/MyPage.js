@@ -1,65 +1,124 @@
 import React, { useEffect, useState } from 'react';
-import { auth, db } from '../firebase';
-import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { auth, db, setUserAuthorName, getUserAuthorName } from '../firebase';
+import { collection, query, where, getDocs, deleteDoc, doc, writeBatch, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import FullPostView from './FullPostView';
 
 const MyPage = ({ isAuth }) => {
   const [postList, setPostList] = useState([]);
   const [authorName, setAuthorName] = useState("");
   const [editingAuthorName, setEditingAuthorName] = useState(false);
-  const [expandedPostId, setExpandedPostId] = useState(null);
+  const [expandedPost, setExpandedPost] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [deletingPostId, setDeletingPostId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isAuth) {
-      navigate("/login");
-      return;
-    }
+    const checkAuthAndFetchPosts = async () => {
+      if (!isAuth) {
+        navigate("/login");
+        return;
+      }
 
-    const getPosts = async () => {
-      try {
-        const postsCollectionRef = collection(db, "posts");
-        const q = query(postsCollectionRef, where("author.id", "==", auth.currentUser.uid));
-        const data = await getDocs(q);
-        setPostList(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
-        if (data.docs.length > 0) {
-          setAuthorName(data.docs[0].data().author.name);
-        }
-      } catch (error) {
-        console.error("Error fetching posts:", error);
+      if (!auth.currentUser) {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+          if (user) {
+            await getPosts(user.uid);
+          } else {
+            navigate("/login");
+          }
+          unsubscribe();
+        });
+      } else {
+        await getPosts(auth.currentUser.uid);
       }
     };
 
-    getPosts();
+    checkAuthAndFetchPosts();
   }, [isAuth, navigate]);
 
-  const deletePost = async (id) => {
+  const getPosts = async (userId) => {
+    try {
+      setLoading(true);
+      const postsCollectionRef = collection(db, "posts");
+      const q = query(postsCollectionRef, where("author.id", "==", userId));
+      const data = await getDocs(q);
+      setPostList(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
+      const name = await getUserAuthorName(userId);
+      setAuthorName(name || '');
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const initiateDeletePost = (id) => {
+    setDeletingPostId(id);
+  };
+
+  const confirmDeletePost = async (id) => {
     try {
       const postDoc = doc(db, "posts", id);
       await deleteDoc(postDoc);
       setPostList(postList.filter((post) => post.id !== id));
+      setExpandedPost(null);
     } catch (error) {
       console.error("Error deleting post:", error);
+      alert("記事の削除中にエラーが発生しました。");
+    } finally {
+      setDeletingPostId(null);
+    }
+  };
+
+  const cancelDeletePost = () => {
+    setDeletingPostId(null);
+  };
+
+  const togglePublishStatus = async (id, currentStatus) => {
+    try {
+      const postDoc = doc(db, "posts", id);
+      await updateDoc(postDoc, { published: !currentStatus });
+      setPostList(postList.map(post => 
+        post.id === id ? { ...post, published: !currentStatus } : post
+      ));
+    } catch (error) {
+      console.error("Error toggling publish status:", error);
     }
   };
 
   const updateAuthorName = async () => {
     try {
-      const postsToUpdate = postList.map(post => ({
+      await setUserAuthorName(auth.currentUser.uid, authorName);
+      setEditingAuthorName(false);
+
+      const batch = writeBatch(db);
+      
+      postList.forEach((post) => {
+        const postRef = doc(db, "posts", post.id);
+        batch.update(postRef, { "author.name": authorName });
+      });
+
+      const commentsQuery = query(collection(db, "comments"), where("author.id", "==", auth.currentUser.uid));
+      const commentsSnapshot = await getDocs(commentsQuery);
+      commentsSnapshot.forEach((commentDoc) => {
+        batch.update(doc(db, "comments", commentDoc.id), { "author.name": authorName });
+      });
+
+      await batch.commit();
+
+      setPostList(postList.map(post => ({
         ...post,
         author: { ...post.author, name: authorName }
-      }));
-
-      await Promise.all(postsToUpdate.map(post => 
-        updateDoc(doc(db, "posts", post.id), { author: post.author })
-      ));
-
-      setPostList(postsToUpdate);
-      setEditingAuthorName(false);
+      })));
     } catch (error) {
       console.error("Error updating author name:", error);
     }
   };
+
+  if (loading) {
+    return <div className="text-center mt-8">Loading...</div>;
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -93,28 +152,65 @@ const MyPage = ({ isAuth }) => {
           <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden">
             <div className="p-6">
               <h2 className="text-xl font-serif font-bold text-gray-900 mb-2">{post.title}</h2>
-              <p className="text-gray-600 mb-4">
-                {expandedPostId === post.id ? post.postText : `${post.postText.substring(0, 100)}...`}
-              </p>
-              <p className="text-sm text-gray-500 mb-2">By: {post.author.name}</p>
+              <p className="text-gray-600 mb-4">{post.postText.substring(0, 100)}...</p>
+              <p className="text-sm text-gray-500 mb-2">Status: {post.published ? 'Published' : 'Draft'}</p>
               <p className="text-xs text-gray-400 mb-2">Created: {new Date(post.createdAt).toLocaleString()}</p>
               {post.updatedAt && (
                 <p className="text-xs text-gray-400 mb-2">Updated: {new Date(post.updatedAt).toLocaleString()}</p>
               )}
-              <div className="flex justify-end space-x-2">
+              <div className="flex flex-wrap justify-end space-x-2 space-y-2">
                 <button 
-                  onClick={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
+                  onClick={() => setExpandedPost(post)}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
-                  {expandedPostId === post.id ? "Collapse" : "Expand"}
+                  Expand
+                </button>
+                <button 
+                  onClick={() => togglePublishStatus(post.id, post.published)}
+                  className={`px-4 py-2 ${post.published ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white rounded`}
+                >
+                  {post.published ? 'Unpublish' : 'Publish'}
                 </button>
                 <button onClick={() => navigate(`/edit/${post.id}`)} className="px-4 py-2 bg-secondary text-white rounded hover:bg-primary">Edit</button>
-                <button onClick={() => deletePost(post.id)} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Delete</button>
+                {deletingPostId === post.id ? (
+                  <>
+                    <p className="w-full text-red-500 text-sm">本当に削除しますか？</p>
+                    <button
+                      onClick={() => confirmDeletePost(post.id)}
+                      className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={cancelDeletePost}
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => initiateDeletePost(post.id)}
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {expandedPost && (
+        <FullPostView 
+          post={expandedPost} 
+          onClose={() => setExpandedPost(null)}
+          onDelete={confirmDeletePost}
+          onEdit={(id) => navigate(`/edit/${id}`)}
+          isAuthor={true}
+        />
+      )}
     </div>
   );
 };

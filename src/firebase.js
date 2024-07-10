@@ -1,6 +1,16 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+
+export const getUserAuthorName = async (userId) => {
+  const userDoc = await getDoc(doc(db, 'users', userId));
+  return userDoc.exists() ? userDoc.data().authorName : null;
+};
+
+export const setUserAuthorName = async (userId, authorName) => {
+  await setDoc(doc(db, 'users', userId), { authorName }, { merge: true });
+};
 
 const firebaseConfig = {
   apiKey: "AIzaSyBDAQ04Uc9nsuGYUJiiapQN0K1oI1VRvIU",

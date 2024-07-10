@@ -1,64 +1,65 @@
 import React, { useEffect, useState } from 'react';
-import { getDocs, collection } from 'firebase/firestore';
+import { getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import FullPostView from './FullPostView';
+import { Link } from 'react-router-dom';
 
 const Home = ({ isAuth }) => {
   const [postList, setPostList] = useState([]);
-  const [expandedPostId, setExpandedPostId] = useState(null);
+  const [expandedPost, setExpandedPost] = useState(null);
 
   useEffect(() => {
     const getPosts = async () => {
-      const data = await getDocs(collection(db, "posts"));
+      const postsCollectionRef = collection(db, "posts");
+      const publishedPostsQuery = query(postsCollectionRef, where("published", "==", true));
+      const data = await getDocs(publishedPostsQuery);
       setPostList(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
     };
     getPosts();
   }, []);
 
-  if (!isAuth) {
+  if (expandedPost) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Welcome to NovelPost</h2>
-            <p className="mt-2 text-center text-sm text-gray-600">Share your literary creations with the world</p>
-          </div>
-          <div>
-            <a
-              href="/login"
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-            >
-              Sign in to start your journey
-            </a>
-          </div>
-        </div>
-      </div>
+      <FullPostView 
+        post={expandedPost} 
+        onClose={() => setExpandedPost(null)}
+        isAuthor={false}
+      />
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-serif font-bold text-primary mb-8">Novel Excerpts</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-serif font-bold text-primary">Novel Excerpts</h1>
+        {!isAuth && (
+          <Link
+            to="/login"
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition duration-300"
+          >
+            Sign in to post
+          </Link>
+        )}
+      </div>
       {postList.length === 0 ? (
-        <p className="text-center text-gray-600">No novels have been posted yet. Be the first to share your story!</p>
+        <p className="text-center text-gray-600">No published novels available at the moment. Check back later!</p>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {postList.map((post) => (
             <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="p-6">
                 <h2 className="text-xl font-serif font-bold text-gray-900 mb-2">{post.title}</h2>
-                <p className="text-gray-600 mb-4">
-                  {expandedPostId === post.id ? post.postText : `${post.postText.substring(0, 150)}...`}
-                </p>
+                <p className="text-gray-600 mb-4">{post.postText.substring(0, 150)}...</p>
                 <p className="text-sm text-gray-500 mb-2">By: {post.author.name}</p>
                 <p className="text-xs text-gray-400 mb-2">Created: {new Date(post.createdAt).toLocaleString()}</p>
                 {post.updatedAt && (
                   <p className="text-xs text-gray-400 mb-2">Updated: {new Date(post.updatedAt).toLocaleString()}</p>
                 )}
                 <button 
-                  onClick={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
-                  className="mt-2 px-4 py-2 bg-secondary text-white rounded hover:bg-primary"
+                  onClick={() => setExpandedPost(post)}
+                  className="mt-2 px-4 py-2 bg-secondary text-white rounded hover:bg-primary transition duration-300"
                 >
-                  {expandedPostId === post.id ? "Collapse" : "Expand"}
+                  Read More
                 </button>
               </div>
             </div>

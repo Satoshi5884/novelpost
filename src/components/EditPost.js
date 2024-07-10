@@ -6,6 +6,7 @@ import { db } from '../firebase';
 const EditPost = ({ isAuth }) => {
   const [title, setTitle] = useState("");
   const [postText, setPostText] = useState("");
+  const [published, setPublished] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -22,6 +23,7 @@ const EditPost = ({ isAuth }) => {
         if (postData.exists()) {
           setTitle(postData.data().title);
           setPostText(postData.data().postText);
+          setPublished(postData.data().published);
         } else {
           console.error("Post not found");
           navigate("/");
@@ -45,6 +47,7 @@ const EditPost = ({ isAuth }) => {
       await updateDoc(postDoc, {
         title: title,
         postText: postText,
+        published: published,
         updatedAt: new Date().toISOString(),
       });
       navigate("/mypage");
@@ -78,6 +81,16 @@ const EditPost = ({ isAuth }) => {
             rows="6"
             required
           />
+        </div>
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="published"
+            checked={published}
+            onChange={(e) => setPublished(e.target.checked)}
+            className="mr-2"
+          />
+          <label htmlFor="published" className="text-sm font-medium text-gray-700">Publish this post</label>
         </div>
         <button 
           type="submit" 
