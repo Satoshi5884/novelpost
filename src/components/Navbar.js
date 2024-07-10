@@ -1,37 +1,30 @@
-import React from 'react'
+import React from 'react';
 import { Link } from 'react-router-dom';
-import './Navbar.css';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowRightToBracket, faFilePen, faHouse } from '@fortawesome/free-solid-svg-icons'
 
-
-const Navbar = ({isAuth}) => {
+const Navbar = ({ isAuth }) => {
   return (
-    <nav>
-        <Link to="/">
-        <FontAwesomeIcon icon={faHouse} />
-            ホーム 
-        </Link>
-
-        {!isAuth ? ( 
-          <Link to="/login">
-          <FontAwesomeIcon icon={faArrowRightToBracket} />
-            ログイン
-        </Link> 
-        ) : (
-          <>
-            <Link to="/createpost">
-              <FontAwesomeIcon icon={faFilePen} />
-              記事投稿
-            </Link>
-            <Link to="/logout">
-              <FontAwesomeIcon icon={faArrowRightToBracket} />
-              ログアウト
-            </Link>
-          </>  
-        )}
+    <nav className="bg-white shadow-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex-shrink-0 flex items-center">
+            <Link to="/" className="text-2xl font-serif font-bold text-primary">NovelPost</Link>
+          </div>
+          <div className="flex items-center">
+            <Link to="/" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-50">Home</Link>
+            {!isAuth ? (
+              <Link to="/login" className="ml-4 px-3 py-2 rounded-md text-sm font-medium text-white bg-primary hover:bg-secondary">Login</Link>
+            ) : (
+              <>
+                <Link to="/createpost" className="ml-4 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-50">Create Post</Link>
+                <Link to="/mypage" className="ml-4 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-50">My Page</Link>
+                <Link to="/logout" className="ml-4 px-3 py-2 rounded-md text-sm font-medium text-white bg-primary hover:bg-secondary">Logout</Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </nav>
-  )
-}
+  );
+};
 
 export default Navbar;
