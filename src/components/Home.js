@@ -7,16 +7,47 @@ import { Link } from 'react-router-dom';
 const Home = ({ isAuth }) => {
   const [postList, setPostList] = useState([]);
   const [expandedPost, setExpandedPost] = useState(null);
+  const [selectedTag, setSelectedTag] = useState(null);
+  const [allTags, setAllTags] = useState([]);
 
   useEffect(() => {
     const getPosts = async () => {
-      const postsCollectionRef = collection(db, "posts");
-      const publishedPostsQuery = query(postsCollectionRef, where("published", "==", true));
-      const data = await getDocs(publishedPostsQuery);
-      setPostList(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
+      try {
+        const postsCollectionRef = collection(db, "posts");
+        let q = query(postsCollectionRef, where("published", "==", true));
+        
+        if (selectedTag) {
+          q = query(q, where("tags", "array-contains", selectedTag));
+        }
+
+        const data = await getDocs(q);
+        const posts = data.docs.map((doc) => {
+          const postData = doc.data();
+          return {
+            ...postData,
+            id: doc.id,
+            pages: Array.isArray(postData.pages) ? postData.pages : [],
+          };
+        });
+        setPostList(posts);
+
+        // Extract all unique tags
+        const tags = [...new Set(posts.flatMap(post => post.tags || []))];
+        setAllTags(tags);
+      } catch (error) {
+        console.error("Error fetching posts:", error);
+        setPostList([]);
+      }
     };
     getPosts();
-  }, []);
+  }, [selectedTag]);
+
+  const getPostContent = (post) => {
+    if (post.pages && post.pages.length > 0 && typeof post.pages[0].content === 'string') {
+      return post.pages[0].content.substring(0, 150);
+    }
+    return "No content available";
+  };
 
   if (expandedPost) {
     return (
@@ -41,6 +72,32 @@ const Home = ({ isAuth }) => {
           </Link>
         )}
       </div>
+
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-2">Tags:</h2>
+        <div className="flex flex-wrap">
+          <button
+            onClick={() => setSelectedTag(null)}
+            className={`mr-2 mb-2 px-3 py-1 rounded-full ${
+              selectedTag === null ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            All
+          </button>
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              onClick={() => setSelectedTag(tag)}
+              className={`mr-2 mb-2 px-3 py-1 rounded-full ${
+                selectedTag === tag ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {postList.length === 0 ? (
         <p className="text-center text-gray-600">No published novels available at the moment. Check back later!</p>
       ) : (
@@ -48,13 +105,23 @@ const Home = ({ isAuth }) => {
           {postList.map((post) => (
             <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="p-6">
-                <h2 className="text-xl font-serif font-bold text-gray-900 mb-2">{post.title}</h2>
-                <p className="text-gray-600 mb-4">{post.postText.substring(0, 150)}...</p>
-                <p className="text-sm text-gray-500 mb-2">By: {post.author.name}</p>
-                <p className="text-xs text-gray-400 mb-2">Created: {new Date(post.createdAt).toLocaleString()}</p>
+                <h2 className="text-xl font-serif font-bold text-gray-900 mb-2">{post.title || "Untitled"}</h2>
+                <p className="text-gray-600 mb-4">
+                  {getPostContent(post)}...
+                </p>
+                <p className="text-sm text-gray-500 mb-2">By: {post.author?.name || "Unknown Author"}</p>
+                <p className="text-xs text-gray-400 mb-2">Pages: {post.pages?.length || 0}</p>
+                <p className="text-xs text-gray-400 mb-2">Created: {post.createdAt ? new Date(post.createdAt).toLocaleString() : "Unknown"}</p>
                 {post.updatedAt && (
                   <p className="text-xs text-gray-400 mb-2">Updated: {new Date(post.updatedAt).toLocaleString()}</p>
                 )}
+                <div className="mb-4">
+                  {post.tags && post.tags.map((tag, index) => (
+                    <span key={index} className="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
                 <button 
                   onClick={() => setExpandedPost(post)}
                   className="mt-2 px-4 py-2 bg-secondary text-white rounded hover:bg-primary transition duration-300"

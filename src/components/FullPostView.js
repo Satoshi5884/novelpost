@@ -1,17 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import CommentSection from './CommentSection';
 
 const FullPostView = ({ post, onClose, onDelete, onEdit, isAuthor }) => {
   const [likes, setLikes] = useState(post.likes || []);
-  const [isLiked, setIsLiked] = useState(false);
-
-  useEffect(() => {
-    if (auth.currentUser) {
-      setIsLiked(likes.includes(auth.currentUser.uid));
-    }
-  }, [likes]);
+  const [isLiked, setIsLiked] = useState(likes.includes(auth.currentUser?.uid));
+  const [currentPage, setCurrentPage] = useState(0);
 
   const handleLike = async () => {
     if (!auth.currentUser) {
@@ -31,15 +26,51 @@ const FullPostView = ({ post, onClose, onDelete, onEdit, isAuthor }) => {
       });
       setLikes([...likes, auth.currentUser.uid]);
     }
+    setIsLiked(!isLiked);
   };
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 0 && newPage < post.pages.length) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const renderPageButtons = () => (
+    <div className="flex justify-center items-center space-x-2 my-4">
+      <button
+        onClick={() => handlePageChange(currentPage - 1)}
+        disabled={currentPage === 0}
+        className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
+      >
+        Previous
+      </button>
+      {post.pages.map((_, index) => (
+        <button
+          key={index}
+          onClick={() => handlePageChange(index)}
+          className={`px-3 py-1 rounded ${currentPage === index ? 'bg-primary text-white' : 'bg-gray-200'}`}
+        >
+          {index + 1}
+        </button>
+      ))}
+      <button
+        onClick={() => handlePageChange(currentPage + 1)}
+        disabled={currentPage === post.pages.length - 1}
+        className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
+      >
+        Next
+      </button>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" id="my-modal">
       <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
         <div className="mt-3">
           <h3 className="text-3xl font-serif font-bold text-primary mb-4">{post.title}</h3>
+          {renderPageButtons()}
           <div className="mt-2 px-7 py-3">
-            <p className="text-gray-700 text-lg mb-4 text-left whitespace-pre-wrap">{post.postText}</p>
+            <p className="text-gray-700 text-lg mb-4 text-left whitespace-pre-wrap">{post.pages[currentPage].content}</p>
             <p className="text-sm text-gray-500 mb-2 text-left">By: {post.author.name}</p>
             <p className="text-xs text-gray-400 mb-2 text-left">Created: {new Date(post.createdAt).toLocaleString()}</p>
             {post.updatedAt && (
@@ -57,6 +88,7 @@ const FullPostView = ({ post, onClose, onDelete, onEdit, isAuthor }) => {
               </button>
             </div>
           </div>
+          {renderPageButtons()}
           <CommentSection postId={post.id} isAuthor={isAuthor} />
           <div className="items-center px-4 py-3">
             <button

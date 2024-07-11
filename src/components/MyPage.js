@@ -43,13 +43,41 @@ const MyPage = ({ isAuth }) => {
       const postsCollectionRef = collection(db, "posts");
       const q = query(postsCollectionRef, where("author.id", "==", userId));
       const data = await getDocs(q);
-      setPostList(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
+      const posts = data.docs.map((doc) => {
+        const postData = doc.data();
+        return {
+          ...postData,
+          id: doc.id,
+          pages: Array.isArray(postData.pages) ? postData.pages : [],
+        };
+      });
+      setPostList(posts);
       const name = await getUserAuthorName(userId);
       setAuthorName(name || '');
     } catch (error) {
       console.error("Error fetching posts:", error);
+      setPostList([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getPostContent = (post) => {
+    if (post.pages && post.pages.length > 0 && typeof post.pages[0].content === 'string') {
+      return post.pages[0].content.substring(0, 100);
+    }
+    return "No content available";
+  };
+
+  const togglePublishStatus = async (id, currentStatus) => {
+    try {
+      const postDoc = doc(db, "posts", id);
+      await updateDoc(postDoc, { published: !currentStatus });
+      setPostList(postList.map(post => 
+        post.id === id ? { ...post, published: !currentStatus } : post
+      ));
+    } catch (error) {
+      console.error("Error toggling publish status:", error);
     }
   };
 
@@ -73,18 +101,6 @@ const MyPage = ({ isAuth }) => {
 
   const cancelDeletePost = () => {
     setDeletingPostId(null);
-  };
-
-  const togglePublishStatus = async (id, currentStatus) => {
-    try {
-      const postDoc = doc(db, "posts", id);
-      await updateDoc(postDoc, { published: !currentStatus });
-      setPostList(postList.map(post => 
-        post.id === id ? { ...post, published: !currentStatus } : post
-      ));
-    } catch (error) {
-      console.error("Error toggling publish status:", error);
-    }
   };
 
   const updateAuthorName = async () => {
@@ -124,6 +140,7 @@ const MyPage = ({ isAuth }) => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-serif font-bold text-primary mb-8">My Novels</h1>
       
+      {/* Author name editing section */}
       <div className="mb-8">
         {editingAuthorName ? (
           <div className="flex items-center">
@@ -151,10 +168,11 @@ const MyPage = ({ isAuth }) => {
         {postList.map((post) => (
           <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden">
             <div className="p-6">
-              <h2 className="text-xl font-serif font-bold text-gray-900 mb-2">{post.title}</h2>
-              <p className="text-gray-600 mb-4">{post.postText.substring(0, 100)}...</p>
+              <h2 className="text-xl font-serif font-bold text-gray-900 mb-2">{post.title || "Untitled"}</h2>
+              <p className="text-gray-600 mb-4">{getPostContent(post)}...</p>
+              <p className="text-sm text-gray-500 mb-2">Pages: {post.pages?.length || 0}</p>
               <p className="text-sm text-gray-500 mb-2">Status: {post.published ? 'Published' : 'Draft'}</p>
-              <p className="text-xs text-gray-400 mb-2">Created: {new Date(post.createdAt).toLocaleString()}</p>
+              <p className="text-xs text-gray-400 mb-2">Created: {post.createdAt ? new Date(post.createdAt).toLocaleString() : "Unknown"}</p>
               {post.updatedAt && (
                 <p className="text-xs text-gray-400 mb-2">Updated: {new Date(post.updatedAt).toLocaleString()}</p>
               )}
