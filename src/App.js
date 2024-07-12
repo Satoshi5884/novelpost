@@ -8,6 +8,14 @@ import Logout from './components/Logout';
 import Navbar from './components/Navbar';
 import MyPage from './components/MyPage';
 import EditPost from './components/EditPost';
+import { addFavoritesToExistingPosts } from './utils/updateExistingPosts';
+
+// FontAwesome
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faStar as fasStar } from '@fortawesome/free-solid-svg-icons';
+import { faStar as farStar } from '@fortawesome/free-regular-svg-icons';
+
+library.add(fasStar, farStar);
 
 function App() {
   const [isAuth, setIsAuth] = useState(localStorage.getItem('isAuth') === 'true');
@@ -25,6 +33,20 @@ function App() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const updatePosts = async () => {
+      if (isAuth) {
+        try {
+          await addFavoritesToExistingPosts();
+          console.log('Favorites field added to existing posts successfully');
+        } catch (error) {
+          console.error('Error adding favorites field to existing posts:', error);
+        }
+      }
+    };
+    updatePosts();
+  }, [isAuth]);
 
   return (
     <Router>

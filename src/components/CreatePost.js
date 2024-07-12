@@ -62,6 +62,7 @@ const CreatePost = ({ isAuth }) => {
         tags,
         published: isPublished,
         likes: [],
+        favorites: [],  // 新しく追加
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });

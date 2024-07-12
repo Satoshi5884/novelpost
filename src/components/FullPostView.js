@@ -1,12 +1,29 @@
-import React, { useState } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import CommentSection from './CommentSection';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 const FullPostView = ({ post, onClose, onDelete, onEdit, isAuthor }) => {
   const [likes, setLikes] = useState(post.likes || []);
+  const [favorites, setFavorites] = useState(post.favorites || []);
   const [isLiked, setIsLiked] = useState(likes.includes(auth.currentUser?.uid));
+  const [isFavorite, setIsFavorite] = useState(favorites.includes(auth.currentUser?.uid));
   const [currentPage, setCurrentPage] = useState(0);
+
+  useEffect(() => {
+    const fetchPostData = async () => {
+      const postDoc = await getDoc(doc(db, 'posts', post.id));
+      if (postDoc.exists()) {
+        const postData = postDoc.data();
+        setLikes(postData.likes || []);
+        setFavorites(postData.favorites || []);
+        setIsLiked(postData.likes?.includes(auth.currentUser?.uid) || false);
+        setIsFavorite(postData.favorites?.includes(auth.currentUser?.uid) || false);
+      }
+    };
+    fetchPostData();
+  }, [post.id]);
 
   const handleLike = async () => {
     if (!auth.currentUser) {
@@ -29,22 +46,39 @@ const FullPostView = ({ post, onClose, onDelete, onEdit, isAuthor }) => {
     setIsLiked(!isLiked);
   };
 
+  const handleFavorite = async () => {
+    if (!auth.currentUser) {
+      alert("Please log in to favorite posts.");
+      return;
+    }
+
+    const postRef = doc(db, 'posts', post.id);
+    if (isFavorite) {
+      await updateDoc(postRef, {
+        favorites: arrayRemove(auth.currentUser.uid)
+      });
+      setFavorites(favorites.filter(id => id !== auth.currentUser.uid));
+    } else {
+      await updateDoc(postRef, {
+        favorites: arrayUnion(auth.currentUser.uid)
+      });
+      setFavorites([...favorites, auth.currentUser.uid]);
+    }
+    setIsFavorite(!isFavorite);
+  };
+
   const handlePageChange = (newPage) => {
     if (newPage >= 0 && newPage < post.pages.length) {
       setCurrentPage(newPage);
     }
   };
 
-  const renderPageButtons = () => (
-    <div className="flex justify-center items-center space-x-2 my-4">
-      <button
-        onClick={() => handlePageChange(currentPage - 1)}
-        disabled={currentPage === 0}
-        className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
-      >
-        Previous
-      </button>
-      {post.pages.map((_, index) => (
+  const renderPageButtons = () => {
+    const totalPages = post.pages.length;
+    const pageButtons = [];
+
+    const addPageButton = (index) => {
+      pageButtons.push(
         <button
           key={index}
           onClick={() => handlePageChange(index)}
@@ -52,16 +86,53 @@ const FullPostView = ({ post, onClose, onDelete, onEdit, isAuthor }) => {
         >
           {index + 1}
         </button>
-      ))}
-      <button
-        onClick={() => handlePageChange(currentPage + 1)}
-        disabled={currentPage === post.pages.length - 1}
-        className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
-      >
-        Next
-      </button>
-    </div>
-  );
+      );
+    };
+
+    // Always show first page
+    addPageButton(0);
+
+    if (totalPages > 7) {
+      if (currentPage > 2) pageButtons.push(<span key="ellipsis1">...</span>);
+
+      // Show current page and one page before and after
+      for (let i = Math.max(1, currentPage - 1); i <= Math.min(currentPage + 1, totalPages - 2); i++) {
+        addPageButton(i);
+      }
+
+      if (currentPage < totalPages - 3) pageButtons.push(<span key="ellipsis2">...</span>);
+    } else {
+      // If 7 or fewer pages, show all pages
+      for (let i = 1; i < totalPages - 1; i++) {
+        addPageButton(i);
+      }
+    }
+
+    // Always show last page if there's more than one page
+    if (totalPages > 1) {
+      addPageButton(totalPages - 1);
+    }
+
+    return (
+      <div className="flex justify-center items-center space-x-2 my-4">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 0}
+          className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
+        >
+          Previous
+        </button>
+        {pageButtons}
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages - 1}
+          className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" id="my-modal">
@@ -76,7 +147,7 @@ const FullPostView = ({ post, onClose, onDelete, onEdit, isAuthor }) => {
             {post.updatedAt && (
               <p className="text-xs text-gray-400 mb-2 text-left">Updated: {new Date(post.updatedAt).toLocaleString()}</p>
             )}
-            <div className="flex items-center mb-4">
+            <div className="flex items-center mb-4 space-x-4">
               <button
                 onClick={handleLike}
                 className={`flex items-center space-x-1 ${isLiked ? 'text-red-500' : 'text-gray-500'}`}
@@ -85,6 +156,13 @@ const FullPostView = ({ post, onClose, onDelete, onEdit, isAuthor }) => {
                   <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
                 </svg>
                 <span>{likes.length} {likes.length === 1 ? 'Like' : 'Likes'}</span>
+              </button>
+              <button
+                onClick={handleFavorite}
+                className={`flex items-center space-x-1 ${isFavorite ? 'text-yellow-500' : 'text-gray-500'}`}
+              >
+                <FontAwesomeIcon icon={isFavorite ? "fa-solid fa-star" : "fa-regular fa-star"} />
+                <span>{favorites.length} {favorites.length === 1 ? 'Favorite' : 'Favorites'}</span>
               </button>
             </div>
           </div>
