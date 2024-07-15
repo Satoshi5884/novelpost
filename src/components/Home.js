@@ -51,13 +51,6 @@ const Home = ({ isAuth }) => {
     getPosts();
   }, [selectedTag, showFavorites]);
 
-  const getPostContent = (post) => {
-    if (post.pages && post.pages.length > 0 && typeof post.pages[0].content === 'string') {
-      return post.pages[0].content.substring(0, 150);
-    }
-    return "No content available";
-  };
-
   if (expandedPost) {
     return (
       <FullPostView 
@@ -127,21 +120,8 @@ const Home = ({ isAuth }) => {
                 )}
                 <h2 className="text-xl font-serif font-bold text-gray-900 mb-2">{post.title || "Untitled"}</h2>
                 <p className="text-gray-600 mb-4">
-                  {getPostContent(post)}...
+                  {post.synopsis || "No synopsis available"}
                 </p>
-                <p className="text-sm text-gray-500 mb-2">By: {post.author?.name || "Unknown Author"}</p>
-                <p className="text-xs text-gray-400 mb-2">Pages: {post.pages?.length || 0}</p>
-                <p className="text-xs text-gray-400 mb-2">Created: {post.createdAt ? new Date(post.createdAt).toLocaleString() : "Unknown"}</p>
-                {post.updatedAt && (
-                  <p className="text-xs text-gray-400 mb-2">Updated: {new Date(post.updatedAt).toLocaleString()}</p>
-                )}
-                <div className="mb-4">
-                  {post.tags && post.tags.map((tag, index) => (
-                    <span key={index} className="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
                 <button 
                   onClick={() => setExpandedPost(post)}
                   className="mt-2 px-4 py-2 bg-secondary text-white rounded hover:bg-primary transition duration-300"

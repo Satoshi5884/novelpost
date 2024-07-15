@@ -135,7 +135,7 @@ const CreatePost = ({ isAuth }) => {
       <h1 className="text-3xl font-serif font-bold text-primary mb-8">Create New Post</h1>
       <form onSubmit={(e) => { e.preventDefault(); createPost(true); }} className="space-y-6">
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title</label>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title(タイトル)</label>
           <input
             type="text"
             id="title"
@@ -146,7 +146,7 @@ const CreatePost = ({ isAuth }) => {
           />
         </div>
         <div>
-          <label htmlFor="synopsis" className="block text-sm font-medium text-gray-700">Synopsis (Max 1000 characters)</label>
+          <label htmlFor="synopsis" className="block text-sm font-medium text-gray-700">Synopsis(あらすじ)、最大 1000 字</label>
           <textarea
             id="synopsis"
             value={synopsis}
@@ -154,9 +154,10 @@ const CreatePost = ({ isAuth }) => {
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
             rows="4"
             maxLength={MAX_SYNOPSIS_CHARS}
+            required
           ></textarea>
           <p className="text-sm text-gray-500 mt-1">
-            {synopsis.length} / {MAX_SYNOPSIS_CHARS} characters
+            {synopsis.length} / {MAX_SYNOPSIS_CHARS} 
           </p>
         </div>
         <div>
@@ -167,11 +168,11 @@ const CreatePost = ({ isAuth }) => {
             accept="image/png, image/jpeg"
             onChange={handleImageUpload}
             className="mt-1 block w-full text-sm text-gray-500
-                      file:mr-4 file:py-2 file:px-4
-                      file:rounded-full file:border-0
-                      file:text-sm file:font-semibold
-                      file:bg-primary file:text-white
-                      hover:file:bg-secondary"
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-full file:border-0
+              file:text-sm file:font-semibold
+              file:bg-primary file:text-white
+              hover:file:bg-secondary"
           />
           {coverImageURL && (
             <img src={coverImageURL} alt="Cover" className="mt-4 max-w-xs rounded shadow" />
@@ -188,7 +189,7 @@ const CreatePost = ({ isAuth }) => {
           />
         </div>
         <div>
-          <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content</label>
+          <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content(本文)、最大 10000 字</label>
           <div className="flex space-x-2 mb-2 overflow-x-auto">
             {pages.map((_, index) => (
               <button
@@ -225,9 +226,9 @@ const CreatePost = ({ isAuth }) => {
             rows="12"
             maxLength={MAX_CHARS_PER_PAGE}
             required
-          />
+          ></textarea>
           <p className="text-sm text-gray-500 mt-1">
-            {pages[currentPage].content.length} / {MAX_CHARS_PER_PAGE} characters
+            {pages[currentPage].content.length} / {MAX_CHARS_PER_PAGE} 
           </p>
         </div>
         <div>

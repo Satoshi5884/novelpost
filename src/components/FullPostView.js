@@ -11,7 +11,7 @@ const FullPostView = ({ post = {}, onClose, onDelete, onEdit, isAuthor }) => {
   const [favorites, setFavorites] = useState(post.favorites || []);
   const [isLiked, setIsLiked] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(null);
 
   useEffect(() => {
     if (auth.currentUser) {
@@ -82,47 +82,63 @@ const FullPostView = ({ post = {}, onClose, onDelete, onEdit, isAuthor }) => {
     const totalPages = post.pages.length;
     const pageButtons = [];
 
-    const addPageButton = (index) => {
+    if (totalPages <= 5) {
+      for (let i = 0; i < totalPages; i++) {
+        pageButtons.push(
+          <button
+            key={i}
+            onClick={() => setCurrentPage(i)}
+            className={`mr-2 mb-2 px-3 py-1 rounded ${currentPage === i ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}`}
+          >
+            {i + 1}
+          </button>
+        );
+      }
+    } else {
+      // Always show first and last page
       pageButtons.push(
         <button
-          key={index}
-          onClick={() => setCurrentPage(index)}
-          className={`px-3 py-1 rounded ${currentPage === index ? 'bg-primary text-white' : 'bg-gray-200'}`}
+          key={0}
+          onClick={() => setCurrentPage(0)}
+          className={`mr-2 mb-2 px-3 py-1 rounded ${currentPage === 0 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}`}
         >
-          {index + 1}
+          1
         </button>
       );
-    };
 
-    // Always show first page
-    addPageButton(0);
-
-    if (totalPages > 5) {
-      if (currentPage > 2) pageButtons.push(<span key="ellipsis1">...</span>);
-
-      // Show current page and one page before and after
-      for (let i = Math.max(1, currentPage - 1); i <= Math.min(currentPage + 1, totalPages - 2); i++) {
-        addPageButton(i);
+      if (currentPage > 2) {
+        pageButtons.push(<span key="ellipsis1">...</span>);
       }
 
-      if (currentPage < totalPages - 3) pageButtons.push(<span key="ellipsis2">...</span>);
-    } else {
-      // If 5 or fewer pages, show all pages
-      for (let i = 1; i < totalPages - 1; i++) {
-        addPageButton(i);
+      // Show current page and one before and after
+      for (let i = Math.max(1, currentPage - 1); i <= Math.min(totalPages - 2, currentPage + 1); i++) {
+        pageButtons.push(
+          <button
+            key={i}
+            onClick={() => setCurrentPage(i)}
+            className={`mr-2 mb-2 px-3 py-1 rounded ${currentPage === i ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}`}
+          >
+            {i + 1}
+          </button>
+        );
       }
+
+      if (currentPage < totalPages - 3) {
+        pageButtons.push(<span key="ellipsis2">...</span>);
+      }
+
+      pageButtons.push(
+        <button
+          key={totalPages - 1}
+          onClick={() => setCurrentPage(totalPages - 1)}
+          className={`mr-2 mb-2 px-3 py-1 rounded ${currentPage === totalPages - 1 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}`}
+        >
+          {totalPages}
+        </button>
+      );
     }
 
-    // Always show last page if there's more than one page
-    if (totalPages > 1) {
-      addPageButton(totalPages - 1);
-    }
-
-    return (
-      <div className="flex justify-center items-center space-x-2 my-4">
-        {pageButtons}
-      </div>
-    );
+    return <div className="flex flex-wrap justify-center mb-4">{pageButtons}</div>;
   };
 
   if (!post || Object.keys(post).length === 0) {
@@ -135,12 +151,40 @@ const FullPostView = ({ post = {}, onClose, onDelete, onEdit, isAuthor }) => {
         <div className="mt-3">
           <h3 className="text-3xl font-serif font-bold text-primary mb-4">{post.title}</h3>
           <div className="mt-2 px-7 py-3">
-            {renderPageButtons()}
-            <h4 className="text-xl font-serif font-bold text-gray-800 mb-2">
-              {post.pages[currentPage].title || `Page ${currentPage + 1}`}
-            </h4>
-            <p className="text-gray-700 text-lg mb-4 text-left whitespace-pre-wrap">{post.pages[currentPage].content}</p>
-            {renderPageButtons()}
+            {currentPage === null ? (
+              <div>
+                {post.coverImageURL && (
+                  <img src={post.coverImageURL} alt={post.title} className="w-full h-48 object-cover mb-4 rounded" />
+                )}
+                <h4 className="text-xl font-serif font-bold text-gray-800 mb-2"></h4>
+                <p className="text-gray-700 text-lg mb-4 text-left whitespace-pre-wrap">{post.synopsis}</p>
+                <h4 className="text-xl font-serif font-bold text-gray-800 mb-2">Pages</h4>
+                {post.pages.map((page, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentPage(index)}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    {index + 1}. {page.title || `Page ${index + 1}`}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div>
+                {renderPageButtons()}
+                <h4 className="text-xl font-serif font-bold text-gray-800 mb-2">
+                  {post.pages[currentPage].title || `Page ${currentPage + 1}`}
+                </h4>
+                <p className="text-gray-700 text-lg mb-4 text-left whitespace-pre-wrap">{post.pages[currentPage].content}</p>
+                {renderPageButtons()}
+                <button
+                  onClick={() => setCurrentPage(null)}
+                  className="mt-4 px-4 py-2 bg-secondary text-white rounded hover:bg-primary transition duration-300"
+                >
+                  Back to Overview
+                </button>
+              </div>
+            )}
             <p className="text-sm text-gray-500 mb-2 text-left">By: {post.author.name}</p>
             <p className="text-xs text-gray-400 mb-2 text-left">Created: {new Date(post.createdAt).toLocaleString()}</p>
             {post.updatedAt && (
