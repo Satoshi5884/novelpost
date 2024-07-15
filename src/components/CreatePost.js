@@ -1,23 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { addDoc, collection } from 'firebase/firestore';
-import { db, auth, getUserAuthorName } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, getUserAuthorName, storage } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
 const MAX_CHARS_PER_PAGE = 10000;
+const MAX_SYNOPSIS_CHARS = 1000;
+const MAX_IMAGE_SIZE = 512; // 最大画像サイズ
 
 const CreatePost = ({ isAuth }) => {
   const [title, setTitle] = useState("");
-  const [pages, setPages] = useState([{ content: "" }]);
+  const [synopsis, setSynopsis] = useState("");
+  const [pages, setPages] = useState([{ title: "", content: "" }]);
   const [currentPage, setCurrentPage] = useState(0);
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
+  const [coverImage, setCoverImage] = useState(null);
+  const [coverImageURL, setCoverImageURL] = useState("");
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!isAuth) {
-      navigate("/login");
+  const addNewPage = () => {
+    setPages([...pages, { title: "", content: "" }]);
+    setCurrentPage(pages.length);
+  };
+
+  const removePage = () => {
+    if (pages.length > 1) {
+      const newPages = pages.filter((_, index) => index !== currentPage);
+      setPages(newPages);
+      setCurrentPage(Math.min(currentPage, newPages.length - 1));
     }
-  }, [isAuth, navigate]);
+  };
+
+  const updatePageContent = (content) => {
+    const newPages = [...pages];
+    newPages[currentPage].content = content;
+    setPages(newPages);
+  };
+
+  const updatePageTitle = (title) => {
+    const newPages = [...pages];
+    newPages[currentPage].title = title;
+    setPages(newPages);
+  };
 
   const addTag = () => {
     if (tagInput.trim() !== "" && !tags.includes(tagInput.trim())) {
@@ -30,27 +55,59 @@ const CreatePost = ({ isAuth }) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  const handlePageChange = (index) => {
-    setCurrentPage(index);
-  };
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          let width = img.width;
+          let height = img.height;
 
-  const addNewPage = () => {
-    setPages([...pages, { content: "" }]);
-    setCurrentPage(pages.length);
-  };
+          // 画像のリサイズ
+          if (width > MAX_IMAGE_SIZE || height > MAX_IMAGE_SIZE) {
+            if (width > height) {
+              height *= MAX_IMAGE_SIZE / width;
+              width = MAX_IMAGE_SIZE;
+            } else {
+              width *= MAX_IMAGE_SIZE / height;
+              height = MAX_IMAGE_SIZE;
+            }
+          }
 
-  const updatePageContent = (content) => {
-    const newPages = [...pages];
-    newPages[currentPage].content = content;
-    setPages(newPages);
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            setCoverImage(blob);
+            setCoverImageURL(URL.createObjectURL(blob));
+          }, 'image/jpeg', 0.95);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const createPost = async (isPublished) => {
     try {
       const authorName = await getUserAuthorName(auth.currentUser.uid) || 'Anonymous';
+      let coverImageURL = "";
+      if (coverImage) {
+        const imageRef = ref(storage, `covers/${new Date().getTime()}`);
+        await uploadBytes(imageRef, coverImage);
+        coverImageURL = await getDownloadURL(imageRef);
+      }
+
       await addDoc(collection(db, "posts"), {
         title,
+        synopsis,
         pages: pages.map(page => ({
+          title: page.title,
           content: page.content,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -62,9 +119,10 @@ const CreatePost = ({ isAuth }) => {
         tags,
         published: isPublished,
         likes: [],
-        favorites: [],  // 新しく追加
+        favorites: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        coverImageURL,
       });
       navigate("/mypage");
     } catch (error) {
@@ -74,45 +132,99 @@ const CreatePost = ({ isAuth }) => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-serif font-bold text-primary mb-8">Create a New Post</h1>
-      <div className="space-y-6">
+      <h1 className="text-3xl font-serif font-bold text-primary mb-8">Create New Post</h1>
+      <form onSubmit={(e) => { e.preventDefault(); createPost(true); }} className="space-y-6">
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title</label>
           <input
             type="text"
             id="title"
-            placeholder="Title..."
+            value={title}
             onChange={(e) => setTitle(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="synopsis" className="block text-sm font-medium text-gray-700">Synopsis (Max 1000 characters)</label>
+          <textarea
+            id="synopsis"
+            value={synopsis}
+            onChange={(e) => setSynopsis(e.target.value.slice(0, MAX_SYNOPSIS_CHARS))}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+            rows="4"
+            maxLength={MAX_SYNOPSIS_CHARS}
+          ></textarea>
+          <p className="text-sm text-gray-500 mt-1">
+            {synopsis.length} / {MAX_SYNOPSIS_CHARS} characters
+          </p>
+        </div>
+        <div>
+          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image</label>
+          <input
+            type="file"
+            id="coverImage"
+            accept="image/png, image/jpeg"
+            onChange={handleImageUpload}
+            className="mt-1 block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-full file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-primary file:text-white
+                      hover:file:bg-secondary"
+          />
+          {coverImageURL && (
+            <img src={coverImageURL} alt="Cover" className="mt-4 max-w-xs rounded shadow" />
+          )}
+        </div>
+        <div>
+          <label htmlFor="pageTitle" className="block text-sm font-medium text-gray-700">Page Title</label>
+          <input
+            type="text"
+            id="pageTitle"
+            value={pages[currentPage].title}
+            onChange={(e) => updatePageTitle(e.target.value)}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
           />
         </div>
         <div>
           <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content</label>
-          <div className="flex space-x-2 mb-2">
+          <div className="flex space-x-2 mb-2 overflow-x-auto">
             {pages.map((_, index) => (
               <button
                 key={index}
-                onClick={() => handlePageChange(index)}
+                type="button"
+                onClick={() => setCurrentPage(index)}
                 className={`px-3 py-1 rounded ${currentPage === index ? 'bg-primary text-white' : 'bg-gray-200'}`}
               >
                 Page {index + 1}
               </button>
             ))}
             <button
+              type="button"
               onClick={addNewPage}
               className="px-3 py-1 rounded bg-secondary text-white"
             >
               +
             </button>
+            {pages.length > 1 && (
+              <button
+                type="button"
+                onClick={removePage}
+                className="px-3 py-1 rounded bg-red-500 text-white"
+              >
+                -
+              </button>
+            )}
           </div>
           <textarea
             id="content"
-            placeholder="Write your story..."
             value={pages[currentPage].content}
             onChange={(e) => updatePageContent(e.target.value)}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
             rows="12"
             maxLength={MAX_CHARS_PER_PAGE}
+            required
           />
           <p className="text-sm text-gray-500 mt-1">
             {pages[currentPage].content.length} / {MAX_CHARS_PER_PAGE} characters
@@ -126,7 +238,7 @@ const CreatePost = ({ isAuth }) => {
               id="tags"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addTag()}
+              onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
               placeholder="Add a tag..."
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
             />
@@ -154,14 +266,21 @@ const CreatePost = ({ isAuth }) => {
           </div>
         </div>
         <div className="flex justify-between">
-          <button onClick={() => createPost(false)} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary bg-primary bg-opacity-20 hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+          <button 
+            type="button"
+            onClick={() => createPost(false)} 
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary bg-primary bg-opacity-20 hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+          >
             Save as Draft
           </button>
-          <button onClick={() => createPost(true)} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+          <button 
+            type="submit" 
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+          >
             Publish Post
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };

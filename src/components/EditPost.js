@@ -1,19 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../firebase';
 
 const MAX_CHARS_PER_PAGE = 10000;
+const MAX_IMAGE_SIZE = 512; // 最大画像サイズ
 
 const EditPost = ({ isAuth }) => {
   const [title, setTitle] = useState("");
-  const [pages, setPages] = useState([{ content: "", createdAt: "", updatedAt: "" }]);
+  const [pages, setPages] = useState([{ title: "", content: "", createdAt: "", updatedAt: "" }]);
   const [currentPage, setCurrentPage] = useState(0);
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
   const [published, setPublished] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [coverImage, setCoverImage] = useState(null);
+  const [coverImageURL, setCoverImageURL] = useState("");
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -30,9 +34,10 @@ const EditPost = ({ isAuth }) => {
         if (postData.exists()) {
           const data = postData.data();
           setTitle(data.title);
-          setPages(data.pages && data.pages.length > 0 ? data.pages : [{ content: "", createdAt: "", updatedAt: "" }]);
+          setPages(data.pages && data.pages.length > 0 ? data.pages : [{ title: "", content: "", createdAt: "", updatedAt: "" }]);
           setTags(data.tags || []);
           setPublished(data.published);
+          setCoverImageURL(data.coverImageURL || "");
         } else {
           setError("Post not found");
           navigate("/");
@@ -55,6 +60,7 @@ const EditPost = ({ isAuth }) => {
 
   const addNewPage = () => {
     const newPage = {
+      title: "",
       content: "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -75,6 +81,18 @@ const EditPost = ({ isAuth }) => {
     }
   };
 
+  const updatePageTitle = (title) => {
+    if (pages && currentPage >= 0 && currentPage < pages.length) {
+      const newPages = [...pages];
+      newPages[currentPage] = {
+        ...newPages[currentPage],
+        title: title,
+        updatedAt: new Date().toISOString()
+      };
+      setPages(newPages);
+    }
+  };
+
   const addTag = () => {
     if (tagInput.trim() !== "" && !tags.includes(tagInput.trim())) {
       setTags([...tags, tagInput.trim()]);
@@ -86,6 +104,44 @@ const EditPost = ({ isAuth }) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          let width = img.width;
+          let height = img.height;
+
+          // 画像のリサイズ
+          if (width > MAX_IMAGE_SIZE || height > MAX_IMAGE_SIZE) {
+            if (width > height) {
+              height *= MAX_IMAGE_SIZE / width;
+              width = MAX_IMAGE_SIZE;
+            } else {
+              width *= MAX_IMAGE_SIZE / height;
+              height = MAX_IMAGE_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            setCoverImage(blob);
+            setCoverImageURL(URL.createObjectURL(blob));
+          }, 'image/jpeg', 0.95);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleUpdate = async (e) => {
     e.preventDefault();
     if (!title || pages.some(page => !page.content)) {
@@ -93,6 +149,13 @@ const EditPost = ({ isAuth }) => {
       return;
     }
     try {
+      let coverImageURL = "";
+      if (coverImage) {
+        const imageRef = ref(storage, `covers/${id}`);
+        await uploadBytes(imageRef, coverImage);
+        coverImageURL = await getDownloadURL(imageRef);
+      }
+
       const postDoc = doc(db, "posts", id);
       await updateDoc(postDoc, {
         title: title,
@@ -100,6 +163,7 @@ const EditPost = ({ isAuth }) => {
         tags: tags,
         published: published,
         updatedAt: new Date().toISOString(),
+        coverImageURL: coverImageURL || null,
       });
       navigate("/mypage");
     } catch (error) {
@@ -121,7 +185,7 @@ const EditPost = ({ isAuth }) => {
       <h1 className="text-3xl font-serif font-bold text-primary mb-8">Edit Post</h1>
       <form onSubmit={handleUpdate} className="space-y-6">
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title</label>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700">Post Title</label>
           <input
             type="text"
             id="title"
@@ -132,16 +196,44 @@ const EditPost = ({ isAuth }) => {
           />
         </div>
         <div>
+          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image</label>
+          <input
+            type="file"
+            id="coverImage"
+            accept="image/png, image/jpeg"
+            onChange={handleImageUpload}
+            className="mt-1 block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-full file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-primary file:text-white
+                      hover:file:bg-secondary"
+          />
+          {coverImageURL && (
+            <img src={coverImageURL} alt="Cover" className="mt-4 max-w-xs rounded shadow" />
+          )}
+        </div>
+        <div>
+          <label htmlFor="pageTitle" className="block text-sm font-medium text-gray-700">Page Title</label>
+          <input
+            type="text"
+            id="pageTitle"
+            value={pages[currentPage]?.title || ""}
+            onChange={(e) => updatePageTitle(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+          />
+        </div>
+        <div>
           <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content</label>
           <div className="flex space-x-2 mb-2 overflow-x-auto">
-            {pages && pages.map((_, index) => (
+            {pages.map((page, index) => (
               <button
                 key={index}
                 type="button"
                 onClick={() => handlePageChange(index)}
                 className={`px-3 py-1 rounded ${currentPage === index ? 'bg-primary text-white' : 'bg-gray-200'}`}
               >
-                Page {index + 1}
+                {page.title || `Page ${index + 1}`}
               </button>
             ))}
             <button
@@ -154,7 +246,7 @@ const EditPost = ({ isAuth }) => {
           </div>
           <textarea
             id="content"
-            value={pages && pages[currentPage] ? pages[currentPage].content : ""}
+            value={pages[currentPage]?.content || ""}
             onChange={(e) => updatePageContent(e.target.value)}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
             rows="12"
@@ -162,7 +254,7 @@ const EditPost = ({ isAuth }) => {
             required
           />
           <p className="text-sm text-gray-500 mt-1">
-            {pages && pages[currentPage] ? pages[currentPage].content.length : 0} / {MAX_CHARS_PER_PAGE} characters
+            {pages[currentPage]?.content.length || 0} / {MAX_CHARS_PER_PAGE} characters
           </p>
         </div>
         <div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getDocs, collection, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import FullPostView from './FullPostView';
 import { Link } from 'react-router-dom';
 
@@ -9,6 +9,7 @@ const Home = ({ isAuth }) => {
   const [expandedPost, setExpandedPost] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
   const [allTags, setAllTags] = useState([]);
+  const [showFavorites, setShowFavorites] = useState(false);
 
   useEffect(() => {
     const getPosts = async () => {
@@ -29,7 +30,15 @@ const Home = ({ isAuth }) => {
             pages: Array.isArray(postData.pages) ? postData.pages : [],
           };
         });
-        setPostList(posts);
+
+        if (showFavorites && auth.currentUser) {
+          const filteredPosts = posts.filter(post => 
+            post.favorites && post.favorites.includes(auth.currentUser.uid)
+          );
+          setPostList(filteredPosts);
+        } else {
+          setPostList(posts);
+        }
 
         // Extract all unique tags
         const tags = [...new Set(posts.flatMap(post => post.tags || []))];
@@ -40,7 +49,7 @@ const Home = ({ isAuth }) => {
       }
     };
     getPosts();
-  }, [selectedTag]);
+  }, [selectedTag, showFavorites]);
 
   const getPostContent = (post) => {
     if (post.pages && post.pages.length > 0 && typeof post.pages[0].content === 'string') {
@@ -74,20 +83,28 @@ const Home = ({ isAuth }) => {
       </div>
 
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Tags:</h2>
+        <h2 className="text-xl font-semibold mb-2">Filters:</h2>
         <div className="flex flex-wrap">
           <button
-            onClick={() => setSelectedTag(null)}
+            onClick={() => { setSelectedTag(null); setShowFavorites(false); }}
             className={`mr-2 mb-2 px-3 py-1 rounded-full ${
-              selectedTag === null ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
+              !selectedTag && !showFavorites ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
             }`}
           >
             All
           </button>
+          <button
+            onClick={() => setShowFavorites(!showFavorites)}
+            className={`mr-2 mb-2 px-3 py-1 rounded-full ${
+              showFavorites ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            Favorites
+          </button>
           {allTags.map((tag) => (
             <button
               key={tag}
-              onClick={() => setSelectedTag(tag)}
+              onClick={() => { setSelectedTag(tag); setShowFavorites(false); }}
               className={`mr-2 mb-2 px-3 py-1 rounded-full ${
                 selectedTag === tag ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
               }`}
@@ -105,6 +122,9 @@ const Home = ({ isAuth }) => {
           {postList.map((post) => (
             <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="p-6">
+                {post.coverImageURL && (
+                  <img src={post.coverImageURL} alt={post.title} className="w-full h-48 object-cover mb-4 rounded" />
+                )}
                 <h2 className="text-xl font-serif font-bold text-gray-900 mb-2">{post.title || "Untitled"}</h2>
                 <p className="text-gray-600 mb-4">
                   {getPostContent(post)}...
