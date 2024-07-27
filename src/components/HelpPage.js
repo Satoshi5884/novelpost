@@ -8,7 +8,7 @@ const HelpPage = () => {
       title: "NovelPostヘルプ",
       htmlTags: {
         title: "使用可能なHTMLタグ",
-        intro: "NovelPostでは、以下のHTMLタグを使用して投稿をフォーマットすることができます：",
+        intro: "NovelPostでは、以下のHTMLタグとカスタムタグを使用して投稿をフォーマットすることができます：",
         tags: [
           { tag: "<p>", description: "段落を作成します", example: "<p>これは新しい段落です。</p>" },
           { tag: "<br>", description: "改行を挿入します", example: "1行目<br>2行目" },
@@ -21,9 +21,10 @@ const HelpPage = () => {
           { tag: "<code>", description: "コードスニペットを表示します", example: "<code>const greeting = 'Hello, World!';</code>" },
           { tag: "<ul> と <li>", description: "順序なしリストを作成します", example: "<ul><li>項目1</li><li>項目2</li></ul>" },
           { tag: "<ol> と <li>", description: "順序付きリストを作成します", example: "<ol><li>最初の項目</li><li>2番目の項目</li></ol>" },
+          { tag: "<img-novel>", description: "アップロードした画像を表示します", example: "<img-novel id=\"画像ID\" />" },
         ],
       },
-      imageWarning: "注意: セキュリティ上の理由から、外部URLからの画像の直接埋め込みはサポートされていません。",
+      imageWarning: "注意: セキュリティ上の理由から、外部URLからの画像の直接埋め込みはサポートされていません。代わりに、<img-novel>タグを使用してアップロードした画像を表示してください。",
       exampleUsage: {
         title: "使用例",
         intro: "これらのタグを使用して小説を書く例を以下に示します：",
@@ -38,7 +39,7 @@ const HelpPage = () => {
       title: "NovelPost Help",
       htmlTags: {
         title: "Available HTML Tags",
-        intro: "In NovelPost, you can use the following HTML tags to format your posts:",
+        intro: "In NovelPost, you can use the following HTML tags and custom tags to format your posts:",
         tags: [
           { tag: "<p>", description: "Creates a paragraph", example: "<p>This is a new paragraph.</p>" },
           { tag: "<br>", description: "Inserts a line break", example: "Line 1<br>Line 2" },
@@ -51,9 +52,10 @@ const HelpPage = () => {
           { tag: "<code>", description: "Displays a code snippet", example: "<code>const greeting = 'Hello, World!';</code>" },
           { tag: "<ul> and <li>", description: "Creates an unordered list", example: "<ul><li>Item 1</li><li>Item 2</li></ul>" },
           { tag: "<ol> and <li>", description: "Creates an ordered list", example: "<ol><li>First item</li><li>Second item</li></ol>" },
+          { tag: "<img-novel>", description: "Displays an uploaded image", example: "<img-novel id=\"imageID\" />" },
         ],
       },
-      imageWarning: "Note: For security reasons, direct embedding of images from external URLs is not supported.",
+      imageWarning: "Note: For security reasons, direct embedding of images from external URLs is not supported. Instead, use the <img-novel> tag to display uploaded images.",
       exampleUsage: {
         title: "Example Usage",
         intro: "Here's an example of how you might use these tags in your novel:",
@@ -117,11 +119,15 @@ const HelpPage = () => {
 
 <p>${language === 'ja' ? 'それは<b>暗く嵐の夜</b>だった。風が木々を通り抜け、サラの背筋に震えを走らせた。' : 'It was a <b>dark and stormy</b> night. The wind howled through the trees, sending shivers down Sarah\'s spine.'}</p>
 
+<img-novel id="stormyNight" />
+
 <p>${language === 'ja' ? '「信じられない、こんなことをしているなんて」' : '"I can\'t believe I\'m doing this,"'} ${language === 'ja' ? '彼女は自分に言い聞かせた。' : 'she muttered to herself.'}</p>
 
 <blockquote>${language === 'ja' ? '「時として、最も勇敢な行動は未知の世界への第一歩を踏み出すことだ」' : '"Sometimes, the bravest thing we can do is take that first step into the unknown."'}</blockquote>
 
 <p>${language === 'ja' ? '祖母の言葉が彼女の心に響き、前進する勇気を与えた。深呼吸をして、サラは<i>廃屋</i>に足を踏み入れた。' : 'Her grandmother\'s words echoed in her mind, giving her the courage to continue. With a deep breath, Sarah stepped into the <i>abandoned house</i>.'}</p>
+
+<img-novel id="abandonedHouse" />
 
 <h3>${language === 'ja' ? '彼女の持ち物：' : 'Her possessions:'}</h3>
 <ul>
