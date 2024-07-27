@@ -11,6 +11,7 @@ const Navbar = ({ isAuth }) => {
           </div>
           <div className="flex items-center">
             <Link to="/" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-50">Home</Link>
+            <Link to="/help" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-50">Help</Link>
             {!isAuth ? (
               <Link to="/login" className="ml-4 px-3 py-2 rounded-md text-sm font-medium text-white bg-primary hover:bg-secondary">Login</Link>
             ) : (

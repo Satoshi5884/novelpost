@@ -8,6 +8,7 @@ import Logout from './components/Logout';
 import Navbar from './components/Navbar';
 import MyPage from './components/MyPage';
 import EditPost from './components/EditPost';
+import HelpPage from './components/HelpPage';
 import { addFavoritesToExistingPosts } from './utils/updateExistingPosts';
 
 // FontAwesome
@@ -59,6 +60,7 @@ function App() {
           <Route path="/logout" element={<Logout setIsAuth={setIsAuth} />} />
           <Route path="/mypage" element={<MyPage isAuth={isAuth} />} />
           <Route path="/edit/:id" element={<EditPost isAuth={isAuth} />} />
+          <Route path="/help" element={<HelpPage />} />
         </Routes>
       </div>
     </Router>
