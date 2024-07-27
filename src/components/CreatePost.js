@@ -1,30 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { addDoc, collection } from 'firebase/firestore';
-import { db, auth, storage, getUserAuthorName } from '../firebase';
+import { db, auth, getUserAuthorName } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { validateImage, uploadImage, deleteImage, downloadImage } from '../utils/imageUtils';
 
 const MAX_CHARS_PER_PAGE = 10000;
-const MAX_IMAGES = 5;
 
 const CreatePost = ({ isAuth }) => {
   const [title, setTitle] = useState("");
-  const [pages, setPages] = useState([{ title: "", content: "" }]);
+  const [pages, setPages] = useState([{ content: "" }]);
   const [currentPage, setCurrentPage] = useState(0);
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
-  const [coverImage, setCoverImage] = useState(null);
-  const [coverImageURL, setCoverImageURL] = useState("");
-  const [novelImages, setNovelImages] = useState([]);
-  const [previewMode, setPreviewMode] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!isAuth) {
-      navigate("/login");
+  const addNewPage = () => {
+    setPages([...pages, { title: "", content: "" }]);
+    setCurrentPage(pages.length);
+  };
+
+  const removePage = () => {
+    if (pages.length > 1) {
+      const newPages = pages.filter((_, index) => index !== currentPage);
+      setPages(newPages);
+      setCurrentPage(Math.min(currentPage, newPages.length - 1));
     }
-  }, [isAuth, navigate]);
+  };
+
+  const updatePageContent = (content) => {
+    const newPages = [...pages];
+    newPages[currentPage].content = content;
+    setPages(newPages);
+  };
+
+  const updatePageTitle = (title) => {
+    const newPages = [...pages];
+    newPages[currentPage].title = title;
+    setPages(newPages);
+  };
 
   const addTag = () => {
     if (tagInput.trim() !== "" && !tags.includes(tagInput.trim())) {
@@ -42,18 +56,8 @@ const CreatePost = ({ isAuth }) => {
   };
 
   const addNewPage = () => {
-    setPages([...pages, { title: "", content: "" }]);
+    setPages([...pages, { content: "" }]);
     setCurrentPage(pages.length);
-  };
-
-  const deletePage = (index) => {
-    if (pages.length > 1) {
-      const newPages = pages.filter((_, i) => i !== index);
-      setPages(newPages);
-      setCurrentPage(Math.min(currentPage, newPages.length - 1));
-    } else {
-      alert("You cannot delete the last page.");
-    }
   };
 
   const updatePageContent = (content) => {
@@ -115,11 +119,18 @@ const CreatePost = ({ isAuth }) => {
   const createPost = async (isPublished) => {
     try {
       const authorName = await getUserAuthorName(auth.currentUser.uid) || 'Anonymous';
+      let coverImageURL = "";
+      if (coverImage) {
+        const imageRef = ref(storage, `covers/${new Date().getTime()}`);
+        await uploadBytes(imageRef, coverImage);
+        coverImageURL = await getDownloadURL(imageRef);
+      }
+
       await addDoc(collection(db, "posts"), {
         title,
+        synopsis,
         pages: pages.map(page => ({
-          title: page.title,
-          content: DOMPurify.sanitize(convertNewlinesToBr(page.content)),
+          content: page.content,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         })),
@@ -130,11 +141,10 @@ const CreatePost = ({ isAuth }) => {
         tags,
         published: isPublished,
         likes: [],
-        favorites: [],
-        coverImageURL,
-        novelImages,
+        favorites: [],  // 新しく追加
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        coverImageURL,
       });
       navigate("/mypage");
     } catch (error) {
@@ -166,15 +176,59 @@ const CreatePost = ({ isAuth }) => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-serif font-bold text-primary mb-8">Create a New Post</h1>
-      <div className="space-y-6">
+      <h1 className="text-3xl font-serif font-bold text-primary mb-8">Create New Post</h1>
+      <form onSubmit={(e) => { e.preventDefault(); createPost(true); }} className="space-y-6">
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title</label>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700">Title(タイトル)</label>
           <input
             type="text"
             id="title"
-            placeholder="Title..."
+            value={title}
             onChange={(e) => setTitle(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="synopsis" className="block text-sm font-medium text-gray-700">Synopsis(あらすじ)、最大 1000 字</label>
+          <textarea
+            id="synopsis"
+            value={synopsis}
+            onChange={(e) => setSynopsis(e.target.value.slice(0, MAX_SYNOPSIS_CHARS))}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+            rows="4"
+            maxLength={MAX_SYNOPSIS_CHARS}
+            required
+          ></textarea>
+          <p className="text-sm text-gray-500 mt-1">
+            {synopsis.length} / {MAX_SYNOPSIS_CHARS} 
+          </p>
+        </div>
+        <div>
+          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image</label>
+          <input
+            type="file"
+            id="coverImage"
+            accept="image/png, image/jpeg"
+            onChange={handleImageUpload}
+            className="mt-1 block w-full text-sm text-gray-500
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-full file:border-0
+              file:text-sm file:font-semibold
+              file:bg-primary file:text-white
+              hover:file:bg-secondary"
+          />
+          {coverImageURL && (
+            <img src={coverImageURL} alt="Cover" className="mt-4 max-w-xs rounded shadow" />
+          )}
+        </div>
+        <div>
+          <label htmlFor="pageTitle" className="block text-sm font-medium text-gray-700">Page Title</label>
+          <input
+            type="text"
+            id="pageTitle"
+            value={pages[currentPage].title}
+            onChange={(e) => updatePageTitle(e.target.value)}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
           />
         </div>
@@ -201,32 +255,33 @@ const CreatePost = ({ isAuth }) => {
           )}
         </div>
         <div>
-          <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content</label>
-          <div className="flex space-x-2 mb-2">
+          <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content(本文)、最大 10000 字</label>
+          <div className="flex space-x-2 mb-2 overflow-x-auto">
             {pages.map((_, index) => (
-              <div key={index} className="relative">
-                <button
-                  onClick={() => handlePageChange(index)}
-                  className={`px-3 py-1 rounded ${currentPage === index ? 'bg-primary text-white' : 'bg-gray-200'}`}
-                >
-                  Page {index + 1}
-                </button>
-                {pages.length > 1 && (
-                  <button
-                    onClick={() => deletePage(index)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
+              <button
+                key={index}
+                onClick={() => handlePageChange(index)}
+                className={`px-3 py-1 rounded ${currentPage === index ? 'bg-primary text-white' : 'bg-gray-200'}`}
+              >
+                Page {index + 1}
+              </button>
             ))}
             <button
+              type="button"
               onClick={addNewPage}
               className="px-3 py-1 rounded bg-secondary text-white"
             >
               +
             </button>
+            {pages.length > 1 && (
+              <button
+                type="button"
+                onClick={removePage}
+                className="px-3 py-1 rounded bg-red-500 text-white"
+              >
+                -
+              </button>
+            )}
           </div>
           <input
             type="text"
@@ -237,15 +292,16 @@ const CreatePost = ({ isAuth }) => {
           />
           <textarea
             id="content"
-            placeholder="Write your story... (HTML tags are supported)"
+            placeholder="Write your story..."
             value={pages[currentPage].content}
             onChange={(e) => updatePageContent(e.target.value)}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
             rows="12"
             maxLength={MAX_CHARS_PER_PAGE}
-          />
+            required
+          ></textarea>
           <p className="text-sm text-gray-500 mt-1">
-            {pages[currentPage].content.length} / {MAX_CHARS_PER_PAGE} characters
+            {pages[currentPage].content.length} / {MAX_CHARS_PER_PAGE} 
           </p>
         </div>
         <div>
@@ -307,33 +363,15 @@ const CreatePost = ({ isAuth }) => {
             ))}
           </div>
         </div>
-        <div className="flex space-x-4">
-          <button
-            onClick={() => setPreviewMode(!previewMode)}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
-          >
-            {previewMode ? "Edit Mode" : "Preview Mode"}
-          </button>
-          <button
-            onClick={() => createPost(false)}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary bg-primary bg-opacity-20 hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-          >
+        <div className="flex justify-between">
+          <button onClick={() => createPost(false)} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary bg-primary bg-opacity-20 hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
             Save as Draft
           </button>
-          <button
-            onClick={() => createPost(true)}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-          >
+          <button onClick={() => createPost(true)} className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
             Publish Post
           </button>
         </div>
       </div>
-      {previewMode && (
-        <div className="mt-8 border-t pt-8">
-          <h2 className="text-2xl font-bold mb-4">Preview</h2>
-          {renderPreview()}
-        </div>
-      )}
     </div>
   );
 };
