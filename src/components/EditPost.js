@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, storage } from '../firebase';
+import { db } from '../firebase';
 import DOMPurify from 'dompurify';
-import { validateImage, uploadImage, deleteImage, downloadImage } from '../utils/imageUtils';
+import { validateAndResizeImage, uploadImage, deleteImage, downloadImage } from '../utils/imageUtils';
 
 const MAX_CHARS_PER_PAGE = 10000;
 const MAX_IMAGES = 5;
@@ -19,7 +19,6 @@ const EditPost = ({ isAuth }) => {
   const [published, setPublished] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [coverImage, setCoverImage] = useState(null);
   const [coverImageURL, setCoverImageURL] = useState("");
   const [novelImages, setNovelImages] = useState([]);
   const [previewMode, setPreviewMode] = useState(false);
@@ -141,16 +140,17 @@ const EditPost = ({ isAuth }) => {
   const removeTag = (tagToRemove) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
+
   const handleCoverImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       try {
-        await validateImage(file);
-        const imageURL = await uploadImage(file, `covers/${id}`);
-        setCoverImage(file);
+        const resizedImage = await validateAndResizeImage(file);
+        const imageURL = await uploadImage(resizedImage, `covers/${id}`);
         setCoverImageURL(imageURL);
       } catch (error) {
-        alert(error);
+        console.error("Error uploading cover image:", error);
+        alert("Failed to upload cover image. Please try again.");
       }
     }
   };
@@ -159,13 +159,14 @@ const EditPost = ({ isAuth }) => {
     const file = e.target.files[0];
     if (file && novelImages.length < MAX_IMAGES) {
       try {
-        await validateImage(file);
-        const imageURL = await uploadImage(file, `novel-images/${id}/${Date.now()}`);
+        const resizedImage = await validateAndResizeImage(file);
+        const imageURL = await uploadImage(resizedImage, `novel-images/${id}/${Date.now()}`);
         const newImage = { id: Date.now().toString(), url: imageURL };
-        setNovelImages([...novelImages, newImage]);
-        updatePageContent(pages[currentPage].content + `<img-novel id="${newImage.id}" />`);
+        setNovelImages(prevImages => [...prevImages, newImage]);
+        updatePageContent(pages[currentPage].content + `[novel-image id="${newImage.id}"]`);
       } catch (error) {
-        alert(error);
+        console.error("Error uploading image:", error);
+        alert("Failed to upload image. Please try again.");
       }
     } else if (novelImages.length >= MAX_IMAGES) {
       alert(`Maximum ${MAX_IMAGES} images allowed per novel.`);
@@ -175,13 +176,18 @@ const EditPost = ({ isAuth }) => {
   const deleteNovelImage = async (imageId) => {
     const imageToDelete = novelImages.find(img => img.id === imageId);
     if (imageToDelete) {
-      await deleteImage(imageToDelete.url);
-      setNovelImages(novelImages.filter(img => img.id !== imageId));
-      const newPages = pages.map(page => ({
-        ...page,
-        content: page.content.replace(`<img-novel id="${imageId}" />`, '')
-      }));
-      setPages(newPages);
+      try {
+        await deleteImage(imageToDelete.url);
+        setNovelImages(novelImages.filter(img => img.id !== imageId));
+        const newPages = pages.map(page => ({
+          ...page,
+          content: page.content.replace(`[novel-image id="${imageId}"]`, '')
+        }));
+        setPages(newPages);
+      } catch (error) {
+        console.error("Error deleting image:", error);
+        alert("Failed to delete image. Please try again.");
+      }
     }
   };
 
@@ -231,9 +237,9 @@ const EditPost = ({ isAuth }) => {
             <h2 className="text-xl font-semibold mb-2">{page.title}</h2>
             <div dangerouslySetInnerHTML={{ 
               __html: DOMPurify.sanitize(
-                convertNewlinesToBr(page.content).replace(/<img-novel id="(\d+)" \/>/g, (match, id) => {
+                convertNewlinesToBr(page.content).replace(/$novel-image id="(\d+)"$/g, (match, id) => {
                   const image = novelImages.find(img => img.id === id);
-                  return image ? `<img src="${image.url}" alt="Novel image" class="max-w-xs rounded shadow" />` : '';
+                  return image ? `<img src="${image.url}" alt="Novel image" class="max-w-xs rounded shadow my-2" />` : '';
                 })
               ) 
             }} />
@@ -255,7 +261,6 @@ const EditPost = ({ isAuth }) => {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-serif font-bold text-primary mb-8">Edit Post</h1>
       <form onSubmit={handleUpdate} className="space-y-6">
-        {/* タイトル入力フィールド */}
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700">Post Title</label>
           <input
@@ -267,32 +272,29 @@ const EditPost = ({ isAuth }) => {
             required
           />
         </div>
-
-        {/* カバー画像アップロードフィールド */}
         <div>
-          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image (JPG, 512x512 max, 400kB max)</label>
+          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image (PNG or JPG, max 512x512, max 300kB)</label>
           <input
             type="file"
             id="coverImage"
-            accept="image/jpeg"
+            accept="image/jpeg,image/png"
             onChange={handleCoverImageUpload}
             className="mt-1 block w-full text-sm text-gray-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-full file:border-0
-              file:text-sm file:font-semibold
-              file:bg-primary file:text-white
-              hover:file:bg-secondary"
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-full file:border-0
+            file:text-sm file:font-semibold
+            file:bg-primary file:text-white
+            hover:file:bg-secondary"
           />
           {coverImageURL && (
             <div className="mt-2">
               <img src={coverImageURL} alt="Cover" className="max-w-xs rounded shadow" />
-              <button type="button" onClick={() => { setCoverImage(null); setCoverImageURL(""); }} className="mt-2 text-red-500">Delete Cover Image</button>
+              <button type="button" onClick={() => { setCoverImageURL(""); }} className="mt-2 text-red-500">Delete Cover Image</button>
               <button type="button" onClick={() => downloadImage(coverImageURL, "cover_image.jpg")} className="ml-4 text-blue-500">Download Cover Image</button>
             </div>
           )}
         </div>
 
-        {/* ページタイトル入力フィールド */}
         <div>
           <label htmlFor="pageTitle" className="block text-sm font-medium text-gray-700">Page Title</label>
           <input
@@ -304,7 +306,6 @@ const EditPost = ({ isAuth }) => {
           />
         </div>
 
-        {/* コンテンツ入力エリア */}
         <div>
           <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content</label>
           <div className="flex space-x-2 mb-2 overflow-x-auto">
@@ -353,20 +354,19 @@ const EditPost = ({ isAuth }) => {
           </p>
         </div>
 
-        {/* 小説画像アップロードフィールド */}
         <div>
-          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (JPG, 512x512 max, 400kB max, 5 images max)</label>
+          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (PNG or JPG, max 512x512, max 300kB, 5 images max)</label>
           <input
             type="file"
             id="novelImage"
-            accept="image/jpeg"
+            accept="image/jpeg,image/png"
             onChange={handleNovelImageUpload}
             className="mt-1 block w-full text-sm text-gray-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-full file:border-0
-              file:text-sm file:font-semibold
-              file:bg-primary file:text-white
-              hover:file:bg-secondary"
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-full file:border-0
+            file:text-sm file:font-semibold
+            file:bg-primary file:text-white
+            hover:file:bg-secondary"
           />
           <div className="mt-2 grid grid-cols-2 gap-4">
             {novelImages.map((image) => (
@@ -379,7 +379,6 @@ const EditPost = ({ isAuth }) => {
           </div>
         </div>
 
-        {/* タグ入力フィールド */}
         <div>
           <label htmlFor="tags" className="block text-sm font-medium text-gray-700">Tags</label>
           <div className="flex items-center">
@@ -391,7 +390,7 @@ const EditPost = ({ isAuth }) => {
               onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
               placeholder="Add a tag..."
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3
-                focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+              focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
             />
             <button
               type="button"
@@ -417,7 +416,6 @@ const EditPost = ({ isAuth }) => {
           </div>
         </div>
 
-        {/* 公開チェックボックス */}
         <div className="flex items-center">
           <input
             type="checkbox"
@@ -429,7 +427,6 @@ const EditPost = ({ isAuth }) => {
           <label htmlFor="published" className="text-sm font-medium text-gray-700">Publish this post</label>
         </div>
 
-        {/* プレビューモードボタンと更新ボタン */}
         <div className="flex space-x-4">
           <button
             type="button"

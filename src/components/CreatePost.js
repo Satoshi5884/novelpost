@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { addDoc, collection } from 'firebase/firestore';
-import { db, auth, storage, getUserAuthorName } from '../firebase';
+import { db, auth, getUserAuthorName } from '../firebase';  // storage を削除
 import { useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
-import { validateImage, uploadImage, deleteImage, downloadImage } from '../utils/imageUtils';
+import { validateAndResizeImage, uploadImage, deleteImage, downloadImage } from '../utils/imageUtils';
 
 const MAX_CHARS_PER_PAGE = 10000;
 const MAX_IMAGES = 5;
@@ -72,9 +72,9 @@ const CreatePost = ({ isAuth }) => {
     const file = e.target.files[0];
     if (file) {
       try {
-        await validateImage(file);
-        const imageURL = await uploadImage(file, `covers/${Date.now()}`);
-        setCoverImage(file);
+        const resizedImage = await validateAndResizeImage(file);
+        const imageURL = await uploadImage(resizedImage, `covers/${Date.now()}`);
+        setCoverImage(resizedImage);
         setCoverImageURL(imageURL);
       } catch (error) {
         alert(error);
@@ -86,13 +86,14 @@ const CreatePost = ({ isAuth }) => {
     const file = e.target.files[0];
     if (file && novelImages.length < MAX_IMAGES) {
       try {
-        await validateImage(file);
-        const imageURL = await uploadImage(file, `novel-images/${Date.now()}`);
+        const resizedImage = await validateAndResizeImage(file);
+        const imageURL = await uploadImage(resizedImage, `novel-images/${Date.now()}`);
         const newImage = { id: Date.now().toString(), url: imageURL };
-        setNovelImages([...novelImages, newImage]);
-        updatePageContent(pages[currentPage].content + `<img-novel id="${newImage.id}" />`);
+        setNovelImages(prevImages => [...prevImages, newImage]);
+        updatePageContent(pages[currentPage].content + `[novel-image id="${newImage.id}"]`);
       } catch (error) {
-        alert(error);
+        console.error("Error uploading image:", error);
+        alert(`Failed to upload image: ${error.message}`);
       }
     } else if (novelImages.length >= MAX_IMAGES) {
       alert(`Maximum ${MAX_IMAGES} images allowed per novel.`);
@@ -179,11 +180,11 @@ const CreatePost = ({ isAuth }) => {
           />
         </div>
         <div>
-          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image (JPG, 512x512 max, 400kB max)</label>
+          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image (PNG or JPG, max 512x512, max 300kB)</label>
           <input
             type="file"
             id="coverImage"
-            accept="image/jpeg"
+            accept="image/jpeg,image/png"
             onChange={handleCoverImageUpload}
             className="mt-1 block w-full text-sm text-gray-500
               file:mr-4 file:py-2 file:px-4
@@ -249,11 +250,11 @@ const CreatePost = ({ isAuth }) => {
           </p>
         </div>
         <div>
-          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (JPG, 512x512 max, 400kB max, 5 images max)</label>
+          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (PNG or JPG, max 512x512, max 300kB, 5 images max)</label>
           <input
             type="file"
             id="novelImage"
-            accept="image/jpeg"
+            accept="image/jpeg,image/png"
             onChange={handleNovelImageUpload}
             className="mt-1 block w-full text-sm text-gray-500
               file:mr-4 file:py-2 file:px-4
