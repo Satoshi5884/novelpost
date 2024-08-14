@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getDocs, collection, query, where } from 'firebase/firestore';
+import { getDocs, collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import FullPostView from './FullPostView';
 import { Link } from 'react-router-dom';
@@ -9,47 +9,53 @@ const Home = ({ isAuth }) => {
   const [expandedPost, setExpandedPost] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
   const [allTags, setAllTags] = useState([]);
-  const [showFavorites, setShowFavorites] = useState(false);
+  const [displayMode, setDisplayMode] = useState('newest');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const getPosts = async () => {
+      setLoading(true);
+      setError(null);
       try {
         const postsCollectionRef = collection(db, "posts");
-        let q = query(postsCollectionRef, where("published", "==", true));
+        let q = query(postsCollectionRef, where("published", "==", true), limit(20));
         
         if (selectedTag) {
           q = query(q, where("tags", "array-contains", selectedTag));
         }
 
-        const data = await getDocs(q);
-        const posts = data.docs.map((doc) => {
-          const postData = doc.data();
-          return {
-            ...postData,
-            id: doc.id,
-            pages: Array.isArray(postData.pages) ? postData.pages : [],
-          };
-        });
-
-        if (showFavorites && auth.currentUser) {
-          const filteredPosts = posts.filter(post => 
-            post.favorites && post.favorites.includes(auth.currentUser.uid)
-          );
-          setPostList(filteredPosts);
-        } else {
-          setPostList(posts);
+        if (displayMode === 'newest') {
+          q = query(q, orderBy("createdAt", "desc"));
+        } else if (displayMode === 'popular') {
+          q = query(q, orderBy("views", "desc"));
         }
 
-        // Extract all unique tags
+        const data = await getDocs(q);
+        let posts = data.docs.map((doc) => ({
+          ...doc.data(),
+          id: doc.id,
+        }));
+
+        if (displayMode === 'favorites' && auth.currentUser) {
+          posts = posts.filter(post => 
+            post.favorites && post.favorites.includes(auth.currentUser.uid)
+          );
+        }
+
+        setPostList(posts);
+
         const tags = [...new Set(posts.flatMap(post => post.tags || []))];
         setAllTags(tags);
       } catch (error) {
         console.error("Error fetching posts:", error);
-        setPostList([]);
+        setError("Failed to load posts. Please try again.");
+      } finally {
+        setLoading(false);
       }
     };
     getPosts();
-  }, [selectedTag, showFavorites]);
+  }, [selectedTag, displayMode]);
 
   if (expandedPost) {
     return (
@@ -76,28 +82,35 @@ const Home = ({ isAuth }) => {
       </div>
 
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Filters:</h2>
+        <h2 className="text-xl font-semibold mb-2">Display Mode:</h2>
+        <div className="flex flex-wrap mb-4">
+          {['newest', 'popular', 'favorites'].map((mode) => (
+            <button
+              key={mode}
+              onClick={() => { setDisplayMode(mode); setSelectedTag(null); }}
+              className={`mr-2 mb-2 px-3 py-1 rounded-full ${
+                displayMode === mode ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        <h2 className="text-xl font-semibold mb-2">Tags:</h2>
         <div className="flex flex-wrap">
           <button
-            onClick={() => { setSelectedTag(null); setShowFavorites(false); }}
+            onClick={() => setSelectedTag(null)}
             className={`mr-2 mb-2 px-3 py-1 rounded-full ${
-              !selectedTag && !showFavorites ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
+              !selectedTag ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
             }`}
           >
             All
           </button>
-          <button
-            onClick={() => setShowFavorites(!showFavorites)}
-            className={`mr-2 mb-2 px-3 py-1 rounded-full ${
-              showFavorites ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
-            }`}
-          >
-            Favorites
-          </button>
           {allTags.map((tag) => (
             <button
               key={tag}
-              onClick={() => { setSelectedTag(tag); setShowFavorites(false); }}
+              onClick={() => setSelectedTag(tag)}
               className={`mr-2 mb-2 px-3 py-1 rounded-full ${
                 selectedTag === tag ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'
               }`}
@@ -108,7 +121,11 @@ const Home = ({ isAuth }) => {
         </div>
       </div>
 
-      {postList.length === 0 ? (
+      {loading ? (
+        <p className="text-center text-gray-600">Loading posts...</p>
+      ) : error ? (
+        <p className="text-center text-red-500">{error}</p>
+      ) : postList.length === 0 ? (
         <p className="text-center text-gray-600">No published novels available at the moment. Check back later!</p>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -119,9 +136,13 @@ const Home = ({ isAuth }) => {
                   <img src={post.coverImageURL} alt={post.title} className="w-full h-48 object-cover mb-4 rounded" />
                 )}
                 <h2 className="text-xl font-serif font-bold text-gray-900 mb-2">{post.title || "Untitled"}</h2>
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-600 mb-2">
                   {post.synopsis || "No synopsis available"}
                 </p>
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-sm text-gray-500">By: {post.author?.name || "Unknown"}</p>
+                  <p className="text-sm text-gray-500">Views: {post.views || 0}</p>
+                </div>
                 <button 
                   onClick={() => setExpandedPost(post)}
                   className="mt-2 px-4 py-2 bg-secondary text-white rounded hover:bg-primary transition duration-300"

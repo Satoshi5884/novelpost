@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, increment } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import CommentSection from './CommentSection';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -13,6 +13,7 @@ const FullPostView = ({ post = {}, onClose, onDelete, onEdit, isAuthor }) => {
   const [isLiked, setIsLiked] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
+  const [views, setViews] = useState(post.views || 0);
 
   useEffect(() => {
     if (auth.currentUser) {
@@ -31,10 +32,24 @@ const FullPostView = ({ post = {}, onClose, onDelete, onEdit, isAuthor }) => {
           setFavorites(postData.favorites || []);
           setIsLiked(postData.likes?.includes(auth.currentUser?.uid) || false);
           setIsFavorite(postData.favorites?.includes(auth.currentUser?.uid) || false);
+          setViews(postData.views || 0);
         }
       }
     };
     fetchPostData();
+  }, [post.id]);
+
+  useEffect(() => {
+    const incrementViews = async () => {
+      if (post.id) {
+        const postRef = doc(db, 'posts', post.id);
+        await updateDoc(postRef, {
+          views: increment(1)
+        });
+        setViews(prevViews => prevViews + 1);
+      }
+    };
+    incrementViews();
   }, [post.id]);
 
   const handleLike = async () => {
@@ -153,6 +168,7 @@ const FullPostView = ({ post = {}, onClose, onDelete, onEdit, isAuthor }) => {
             {post.updatedAt && (
               <p className="text-xs text-gray-400 mb-2 text-left">Updated: {new Date(post.updatedAt).toLocaleString()}</p>
             )}
+            <p className="text-xs text-gray-400 mb-2 text-left">Views: {views}</p>
             <div className="flex items-center mb-4 space-x-4">
               <button
                 onClick={handleLike}
