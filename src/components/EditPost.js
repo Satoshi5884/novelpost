@@ -22,6 +22,7 @@ const EditPost = ({ isAuth }) => {
   const [coverImageURL, setCoverImageURL] = useState("");
   const [novelImages, setNovelImages] = useState([]);
   const [previewMode, setPreviewMode] = useState(false);
+  const [synopsis, setSynopsis] = useState("");
 
   const fetchPost = useCallback(async () => {
     if (!id) {
@@ -37,6 +38,7 @@ const EditPost = ({ isAuth }) => {
       if (postDoc.exists()) {
         const postData = postDoc.data();
         setTitle(postData.title);
+        setSynopsis(postData.synopsis || "");
         setPages(postData.pages && postData.pages.length > 0 ? postData.pages.map(page => ({
           ...page,
           content: convertBrToNewlines(page.content)
@@ -201,7 +203,7 @@ const EditPost = ({ isAuth }) => {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    if (!title || pages.some(page => !page.content)) {
+    if (!title || !synopsis || pages.some(page => !page.content)) {
       alert("Please fill in all fields");
       return;
     }
@@ -209,6 +211,7 @@ const EditPost = ({ isAuth }) => {
       const postDoc = doc(db, "posts", id);
       await updateDoc(postDoc, {
         title: title,
+        synopsis: synopsis,
         pages: pages.map(page => ({
           ...page,
           content: DOMPurify.sanitize(convertNewlinesToBr(page.content)),
@@ -270,6 +273,17 @@ const EditPost = ({ isAuth }) => {
             onChange={(e) => setTitle(e.target.value)}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
             required
+          />
+        </div>
+        <div>
+          <label htmlFor="synopsis" className="block text-sm font-medium text-gray-700">Synopsis</label>
+          <textarea
+            id="synopsis"
+            placeholder="Synopsis..."
+            value={synopsis}
+            onChange={(e) => setSynopsis(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+            rows="3"
           />
         </div>
         <div>

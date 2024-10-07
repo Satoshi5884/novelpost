@@ -153,6 +153,30 @@ const FullPostView = ({ post = {}, onClose, onDelete, onEdit, isAuthor }) => {
           {post.coverImageURL && (
             <img src={post.coverImageURL} alt={post.title} className="w-full h-48 object-cover mb-4 rounded" />
           )}
+          
+          {post.synopsis && (
+            <div className="mb-4">
+              <h4 className="text-lg font-semibold">Synopsis</h4>
+              <p className="text-gray-700">{post.synopsis}</p>
+            </div>
+          )}
+
+          <div className="mb-4">
+            <h4 className="text-lg font-semibold">ページ一覧</h4>
+            <ul className="list-disc list-inside">
+              {post.pages.map((page, index) => (
+                <li key={index}>
+                  <button
+                    onClick={() => setCurrentPage(index)}
+                    className="text-blue-500 hover:underline"
+                  >
+                    {`${index + 1}. ${page.title || `Page ${index + 1}`}`}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
           <div className="mt-2 px-7 py-3">
             {renderPageButtons()}
             <h4 className="text-xl font-serif font-bold text-gray-800 mb-2">

@@ -19,6 +19,7 @@ const CreatePost = ({ isAuth }) => {
   const [novelImages, setNovelImages] = useState([]);
   const [previewMode, setPreviewMode] = useState(false);
   const navigate = useNavigate();
+  const [synopsis, setSynopsis] = useState("");
 
   useEffect(() => {
     if (!isAuth) {
@@ -118,6 +119,7 @@ const CreatePost = ({ isAuth }) => {
       const authorName = await getUserAuthorName(auth.currentUser.uid) || 'Anonymous';
       await addDoc(collection(db, "posts"), {
         title,
+        synopsis,
         pages: pages.map(page => ({
           title: page.title,
           content: DOMPurify.sanitize(convertNewlinesToBr(page.content)),
@@ -307,6 +309,17 @@ const CreatePost = ({ isAuth }) => {
               </span>
             ))}
           </div>
+        </div>
+        <div>
+          <label htmlFor="synopsis" className="block text-sm font-medium text-gray-700">Synopsis</label>
+          <textarea
+            id="synopsis"
+            placeholder="Synopsis..."
+            value={synopsis}
+            onChange={(e) => setSynopsis(e.target.value)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+            rows="3"
+          />
         </div>
         <div className="flex space-x-4">
           <button
