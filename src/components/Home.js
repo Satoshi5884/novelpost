@@ -19,7 +19,7 @@ const Home = ({ isAuth }) => {
       setError(null);
       try {
         const postsCollectionRef = collection(db, "posts");
-        let q = query(postsCollectionRef, where("published", "==", true), limit(20));
+        let q = query(postsCollectionRef, where("published", "==", true));
         
         if (selectedTag) {
           q = query(q, where("tags", "array-contains", selectedTag));
@@ -30,6 +30,8 @@ const Home = ({ isAuth }) => {
         } else if (displayMode === 'popular') {
           q = query(q, orderBy("views", "desc"));
         }
+
+        q = query(q, limit(20));
 
         const data = await getDocs(q);
         let posts = data.docs.map((doc) => ({
