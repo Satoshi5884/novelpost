@@ -271,7 +271,7 @@ const CreatePost = ({ isAuth }) => {
           </p>
         </div>
         <div>
-          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (JPG, max 512x512, max 300kB, 5 images max)</label>
+          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (JPG, max 512x512, max 300kB, {MAX_IMAGES} images max)</label>
           <input
             type="file"
             id="novelImage"
@@ -288,6 +288,9 @@ const CreatePost = ({ isAuth }) => {
             {novelImages.map((image) => (
               <div key={image.id} className="relative">
                 <img src={image.url} alt="Novel" className="max-w-full h-auto rounded shadow" />
+                <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded">
+                  ID: {image.id}
+                </div>
                 <button onClick={() => deleteNovelImage(image.id)} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded">Delete</button>
                 <button onClick={() => downloadImage(image.url, `novel_image_${image.id}.jpg`)} className="absolute bottom-0 right-0 bg-blue-500 text-white p-1 rounded">Download</button>
               </div>
