@@ -11,6 +11,7 @@ const MyPage = ({ isAuth }) => {
   const [expandedPost, setExpandedPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deletingPostId, setDeletingPostId] = useState(null);
+  const [userEmail, setUserEmail] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +24,7 @@ const MyPage = ({ isAuth }) => {
       if (!auth.currentUser) {
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
           if (user) {
+            setUserEmail(user.email);
             await getPosts(user.uid);
           } else {
             navigate("/login");
@@ -30,6 +32,7 @@ const MyPage = ({ isAuth }) => {
           unsubscribe();
         });
       } else {
+        setUserEmail(auth.currentUser.email);
         await getPosts(auth.currentUser.uid);
       }
     };
@@ -140,6 +143,11 @@ const MyPage = ({ isAuth }) => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <h1 className="text-3xl font-serif font-bold text-primary mb-8">My Novels</h1>
       
+      {/* メールアドレス表示セクション */}
+      <div className="mb-4">
+        <p className="text-gray-600">ログイン中のアカウント: {userEmail}</p>
+      </div>
+      
       {/* Author name editing section */}
       <div className="mb-8">
         {editingAuthorName ? (
@@ -151,14 +159,14 @@ const MyPage = ({ isAuth }) => {
               className="mr-2 px-2 py-1 border rounded"
             />
             <button onClick={updateAuthorName} className="px-4 py-2 bg-secondary text-white rounded hover:bg-primary">
-              Save
+              保存
             </button>
           </div>
         ) : (
           <div className="flex items-center">
-            <p className="mr-2">Author Name: {authorName}</p>
+            <p className="mr-2">著者名: {authorName}</p>
             <button onClick={() => setEditingAuthorName(true)} className="px-4 py-2 bg-secondary text-white rounded hover:bg-primary">
-              Edit
+              編集
             </button>
           </div>
         )}

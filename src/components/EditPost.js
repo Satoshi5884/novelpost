@@ -8,6 +8,18 @@ import { validateAndResizeImage, uploadImage, deleteImage, downloadImage } from 
 const MAX_CHARS_PER_PAGE = 10000;
 const MAX_IMAGES = 5;
 
+// DOMPurifyの設定を変更して<img-novel>タグを許可
+DOMPurify.addHook('uponSanitize', (node) => {
+  if (node.tagName === 'IMG-NOVEL') {
+    node.setAttribute('data-allowed', 'true');
+  }
+});
+
+DOMPurify.setConfig({
+  ADD_TAGS: ['img-novel'],
+  ADD_ATTR: ['id'],
+});
+
 const EditPost = ({ isAuth }) => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -194,11 +206,11 @@ const EditPost = ({ isAuth }) => {
   };
 
   const convertNewlinesToBr = (text) => {
-    return text.replace(/\n/g, '<br />');
+    return text.replace(/\n/g, '<br />').replace(/\[novel-image id="(\d+)"\]/g, '<img-novel id="$1" />');
   };
 
   const convertBrToNewlines = (html) => {
-    return html.replace(/<br\s*\/?>/gi, '\n');
+    return html.replace(/<br\s*\/?>/gi, '\n').replace(/<img-novel id="(\d+)"(?: \/)?>/g, '[novel-image id="$1"]');
   };
 
   const handleUpdate = async (e) => {
@@ -214,7 +226,10 @@ const EditPost = ({ isAuth }) => {
         synopsis: synopsis,
         pages: pages.map(page => ({
           ...page,
-          content: DOMPurify.sanitize(convertNewlinesToBr(page.content)),
+          content: DOMPurify.sanitize(convertNewlinesToBr(page.content), {
+            ALLOW_UNKNOWN_PROTOCOLS: true,
+            FORCE_BODY: true,
+          }),
           updatedAt: new Date().toISOString()
         })),
         tags: tags,
@@ -240,10 +255,14 @@ const EditPost = ({ isAuth }) => {
             <h2 className="text-xl font-semibold mb-2">{page.title}</h2>
             <div dangerouslySetInnerHTML={{ 
               __html: DOMPurify.sanitize(
-                convertNewlinesToBr(page.content).replace(/$novel-image id="(\d+)"$/g, (match, id) => {
+                convertNewlinesToBr(page.content).replace(/<img-novel id="(\d+)"(?: \/)?>/g, (match, id) => {
                   const image = novelImages.find(img => img.id === id);
                   return image ? `<img src="${image.url}" alt="Novel image" class="max-w-xs rounded shadow my-2" />` : '';
-                })
+                }),
+                {
+                  ALLOW_UNKNOWN_PROTOCOLS: true,
+                  FORCE_BODY: true,
+                }
               ) 
             }} />
           </div>
@@ -287,7 +306,7 @@ const EditPost = ({ isAuth }) => {
           />
         </div>
         <div>
-          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image (PNG or JPG, max 512x512, max 300kB)</label>
+          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image (JPG, max 512x512, max 300kB)</label>
           <input
             type="file"
             id="coverImage"
@@ -369,7 +388,7 @@ const EditPost = ({ isAuth }) => {
         </div>
 
         <div>
-          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (PNG or JPG, max 512x512, max 300kB, 5 images max)</label>
+          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (JPG, max 512x512, max 300kB, {MAX_IMAGES} images max)</label>
           <input
             type="file"
             id="novelImage"
@@ -386,6 +405,9 @@ const EditPost = ({ isAuth }) => {
             {novelImages.map((image) => (
               <div key={image.id} className="relative">
                 <img src={image.url} alt="Novel" className="max-w-full h-auto rounded shadow" />
+                <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded">
+                  ID: {image.id}
+                </div>
                 <button type="button" onClick={() => deleteNovelImage(image.id)} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded">Delete</button>
                 <button type="button" onClick={() => downloadImage(image.url, `novel_image_${image.id}.jpg`)} className="absolute bottom-0 right-0 bg-blue-500 text-white p-1 rounded">Download</button>
               </div>

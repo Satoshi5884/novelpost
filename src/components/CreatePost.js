@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { addDoc, collection } from 'firebase/firestore';
-import { db, auth, getUserAuthorName } from '../firebase';  // storage を削除
+import { db, auth, getUserAuthorName } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { validateAndResizeImage, uploadImage, deleteImage, downloadImage } from '../utils/imageUtils';
 
 const MAX_CHARS_PER_PAGE = 10000;
 const MAX_IMAGES = 5;
+
+// DOMPurifyの設定を変更して<img-novel>タグを許可
+DOMPurify.addHook('uponSanitize', (node) => {
+  if (node.tagName === 'IMG-NOVEL') {
+    node.setAttribute('data-allowed', 'true');
+  }
+});
+
+DOMPurify.setConfig({
+  ADD_TAGS: ['img-novel'],
+  ADD_ATTR: ['id'],
+});
 
 const CreatePost = ({ isAuth }) => {
   const [title, setTitle] = useState("");
@@ -111,7 +123,7 @@ const CreatePost = ({ isAuth }) => {
   };
 
   const convertNewlinesToBr = (text) => {
-    return text.replace(/\n/g, '<br />');
+    return text.replace(/\n/g, '<br />').replace(/\[novel-image id="(\d+)"\]/g, '<img-novel id="$1" />');
   };
 
   const createPost = async (isPublished) => {
@@ -122,7 +134,10 @@ const CreatePost = ({ isAuth }) => {
         synopsis,
         pages: pages.map(page => ({
           title: page.title,
-          content: DOMPurify.sanitize(convertNewlinesToBr(page.content)),
+          content: DOMPurify.sanitize(convertNewlinesToBr(page.content), {
+            ALLOW_UNKNOWN_PROTOCOLS: true,
+            FORCE_BODY: true,
+          }),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         })),
@@ -155,10 +170,14 @@ const CreatePost = ({ isAuth }) => {
             <h2 className="text-xl font-semibold mb-2">{page.title}</h2>
             <div dangerouslySetInnerHTML={{ 
               __html: DOMPurify.sanitize(
-                convertNewlinesToBr(page.content).replace(/<img-novel id="(\d+)" \/>/g, (match, id) => {
+                convertNewlinesToBr(page.content).replace(/<img-novel id="(\d+)"(?: \/)?>/g, (match, id) => {
                   const image = novelImages.find(img => img.id === id);
-                  return image ? `<img src="${image.url}" alt="Novel image" class="max-w-xs rounded shadow" />` : '';
-                })
+                  return image ? `<img src="${image.url}" alt="Novel image" class="max-w-xs rounded shadow my-2" />` : '';
+                }),
+                {
+                  ALLOW_UNKNOWN_PROTOCOLS: true,
+                  FORCE_BODY: true,
+                }
               ) 
             }} />
           </div>
@@ -182,7 +201,7 @@ const CreatePost = ({ isAuth }) => {
           />
         </div>
         <div>
-          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image (PNG or JPG, max 512x512, max 300kB)</label>
+          <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700">Cover Image (JPG, max 512x512, max 300kB)</label>
           <input
             type="file"
             id="coverImage"
@@ -252,7 +271,7 @@ const CreatePost = ({ isAuth }) => {
           </p>
         </div>
         <div>
-          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (PNG or JPG, max 512x512, max 300kB, 5 images max)</label>
+          <label htmlFor="novelImage" className="block text-sm font-medium text-gray-700">Novel Images (JPG, max 512x512, max 300kB, 5 images max)</label>
           <input
             type="file"
             id="novelImage"

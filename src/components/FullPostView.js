@@ -141,6 +141,16 @@ const FullPostView = ({ post = {}, onClose, onDelete, onEdit, isAuthor }) => {
     );
   };
 
+  const renderContent = (content) => {
+    const sanitizedContent = DOMPurify.sanitize(content);
+    return sanitizedContent.replace(/<img-novel id="(\d+)"(?: \/)?>/g, (match, id) => {
+      const image = post.novelImages?.find(img => img.id === id);
+      return image 
+        ? `<img src="${image.url}" alt="Novel image" class="max-w-xs rounded shadow my-2" />`
+        : match; // 画像が見つからない場合は元のタグをそのまま返す
+    });
+  };
+
   if (!post || Object.keys(post).length === 0) {
     return <div>No post data available.</div>;
   }
@@ -184,7 +194,7 @@ const FullPostView = ({ post = {}, onClose, onDelete, onEdit, isAuthor }) => {
             </h4>
             <div 
               className="text-gray-700 text-lg mb-4 text-left whitespace-pre-wrap"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.pages[currentPage].content) }}
+              dangerouslySetInnerHTML={{ __html: renderContent(post.pages[currentPage].content) }}
             />
             {renderPageButtons()}
             <p className="text-sm text-gray-500 mb-2 text-left">By: {post.author.name}</p>
