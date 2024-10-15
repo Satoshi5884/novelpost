@@ -4,6 +4,9 @@ import { db, auth, getUserAuthorName } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { validateAndResizeImage, uploadImage, deleteImage, downloadImage } from '../utils/imageUtils';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCloudBolt } from '@fortawesome/free-solid-svg-icons';
+import axios from 'axios';
 
 const MAX_CHARS_PER_PAGE = 10000;
 const MAX_IMAGES = 5;
@@ -32,6 +35,7 @@ const CreatePost = ({ isAuth }) => {
   const [previewMode, setPreviewMode] = useState(false);
   const navigate = useNavigate();
   const [synopsis, setSynopsis] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (!isAuth) {
@@ -160,6 +164,31 @@ const CreatePost = ({ isAuth }) => {
     }
   };
 
+  const generateAIContent = async () => {
+    setIsGenerating(true);
+    try {
+      const prompt = `タイトル: ${title}\nページタイトル: ${pages[currentPage].title}\n現在の内容: ${pages[currentPage].content}\n\n約5000文字で物語を続けてください:`;
+
+      const response = await axios.post(
+        'http://localhost:5000/api/generate-ai-content',
+        { prompt },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const generatedContent = response.data.content;
+      updatePageContent(pages[currentPage].content + '\n\n' + generatedContent);
+    } catch (error) {
+      console.error('AIコンテンツ生成エラー:', error.response ? error.response.data : error.message);
+      alert('AIによるコンテンツ生成に失敗しました。コンソールを確認してください。');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const renderPreview = () => {
     return (
       <div className="preview-container">
@@ -224,39 +253,55 @@ const CreatePost = ({ isAuth }) => {
         </div>
         <div>
           <label htmlFor="content" className="block text-sm font-medium text-gray-700">Content</label>
-          <div className="flex space-x-2 mb-2">
-            {pages.map((_, index) => (
-              <div key={index} className="relative">
-                <button
-                  onClick={() => handlePageChange(index)}
-                  className={`px-3 py-1 rounded ${currentPage === index ? 'bg-primary text-white' : 'bg-gray-200'}`}
-                >
-                  Page {index + 1}
-                </button>
-                {pages.length > 1 && (
+          <div className="overflow-x-auto">
+            <div className="flex space-x-2 mb-2 min-w-max">
+              {pages.map((_, index) => (
+                <div key={index} className="relative">
                   <button
-                    onClick={() => deletePage(index)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                    onClick={() => handlePageChange(index)}
+                    className={`px-3 py-1 rounded ${currentPage === index ? 'bg-primary text-white' : 'bg-gray-200'}`}
                   >
-                    ×
+                    Page {index + 1}
                   </button>
-                )}
-              </div>
-            ))}
+                  {pages.length > 1 && (
+                    <button
+                      onClick={() => deletePage(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={addNewPage}
+                className="px-3 py-1 rounded bg-secondary text-white"
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center mb-2">
+            <input
+              type="text"
+              value={pages[currentPage].title}
+              onChange={(e) => updatePageTitle(e.target.value)}
+              placeholder="Page title..."
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm mr-2"
+            />
             <button
-              onClick={addNewPage}
-              className="px-3 py-1 rounded bg-secondary text-white"
+              onClick={generateAIContent}
+              disabled={isGenerating}
+              className="px-3 py-2 bg-secondary text-white rounded-md hover:bg-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary text-xs whitespace-nowrap relative group"
+              title="AI Assist"
             >
-              +
+              <FontAwesomeIcon icon={faCloudBolt} className="mr-1" />
+              {isGenerating ? 'Gen...' : 'AI'}
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                AI Assist
+              </span>
             </button>
           </div>
-          <input
-            type="text"
-            value={pages[currentPage].title}
-            onChange={(e) => updatePageTitle(e.target.value)}
-            placeholder="Page title..."
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm mb-2"
-          />
           <textarea
             id="content"
             placeholder="Write your story... (HTML tags are supported)"

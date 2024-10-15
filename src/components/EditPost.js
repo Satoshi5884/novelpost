@@ -4,6 +4,9 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import DOMPurify from 'dompurify';
 import { validateAndResizeImage, uploadImage, deleteImage, downloadImage } from '../utils/imageUtils';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCloudBolt } from '@fortawesome/free-solid-svg-icons';
+import axios from 'axios';
 
 const MAX_CHARS_PER_PAGE = 10000;
 const MAX_IMAGES = 5;
@@ -35,6 +38,7 @@ const EditPost = ({ isAuth }) => {
   const [novelImages, setNovelImages] = useState([]);
   const [previewMode, setPreviewMode] = useState(false);
   const [synopsis, setSynopsis] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const fetchPost = useCallback(async () => {
     if (!id) {
@@ -271,6 +275,31 @@ const EditPost = ({ isAuth }) => {
     );
   };
 
+  const generateAIContent = async () => {
+    setIsGenerating(true);
+    try {
+      const prompt = `Title: ${title}\nPage Title: ${pages[currentPage].title}\nCurrent Content: ${pages[currentPage].content}\n\nContinue the story in about 5000 characters:`;
+
+      const response = await axios.post(
+        'http://localhost:5000/api/generate-ai-content',
+        { prompt },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const generatedContent = response.data.content;
+      updatePageContent(pages[currentPage].content + '\n\n' + generatedContent);
+    } catch (error) {
+      console.error('AI content generation error:', error.response ? error.response.data : error.message);
+      alert('Failed to generate AI content. Please check the console.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   if (loading) {
     return <div className="text-center mt-8">Loading...</div>;
   }
@@ -330,13 +359,28 @@ const EditPost = ({ isAuth }) => {
 
         <div>
           <label htmlFor="pageTitle" className="block text-sm font-medium text-gray-700">Page Title</label>
-          <input
-            type="text"
-            id="pageTitle"
-            value={pages[currentPage]?.title || ""}
-            onChange={(e) => updatePageTitle(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-          />
+          <div className="flex items-center">
+            <input
+              type="text"
+              id="pageTitle"
+              value={pages[currentPage]?.title || ""}
+              onChange={(e) => updatePageTitle(e.target.value)}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+            />
+            <button
+              type="button"
+              onClick={generateAIContent}
+              disabled={isGenerating}
+              className="ml-2 px-3 py-2 bg-secondary text-white rounded-md hover:bg-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary text-xs whitespace-nowrap relative group"
+              title="AI Assist"
+            >
+              <FontAwesomeIcon icon={faCloudBolt} className="mr-1" />
+              {isGenerating ? 'Gen...' : 'AI'}
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                AI Assist
+              </span>
+            </button>
+          </div>
         </div>
 
         <div>
