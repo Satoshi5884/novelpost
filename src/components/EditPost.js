@@ -281,7 +281,7 @@ const EditPost = ({ isAuth }) => {
       const prompt = `Title: ${title}\nPage Title: ${pages[currentPage].title}\nCurrent Content: ${pages[currentPage].content}\n\nContinue the story in about 5000 characters:`;
 
       const response = await axios.post(
-        'http://localhost:5000/api/generate-ai-content',
+        '/api/generate-ai-content',
         { prompt },
         {
           headers: {

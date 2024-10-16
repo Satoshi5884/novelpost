@@ -170,7 +170,7 @@ const CreatePost = ({ isAuth }) => {
       const prompt = `タイトル: ${title}\nページタイトル: ${pages[currentPage].title}\n現在の内容: ${pages[currentPage].content}\n\n約5000文字で物語を続けてください:`;
 
       const response = await axios.post(
-        'http://localhost:5000/api/generate-ai-content',
+        '/api/generate-ai-content',
         { prompt },
         {
           headers: {
@@ -268,7 +268,7 @@ const CreatePost = ({ isAuth }) => {
                       onClick={() => deletePage(index)}
                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
                     >
-                      ×
+
                     </button>
                   )}
                 </div>
