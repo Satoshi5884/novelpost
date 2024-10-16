@@ -29,7 +29,6 @@ const CreatePost = ({ isAuth }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
-  const [coverImage, setCoverImage] = useState(null);
   const [coverImageURL, setCoverImageURL] = useState("");
   const [novelImages, setNovelImages] = useState([]);
   const [previewMode, setPreviewMode] = useState(false);
@@ -91,7 +90,6 @@ const CreatePost = ({ isAuth }) => {
       try {
         const resizedImage = await validateAndResizeImage(file);
         const imageURL = await uploadImage(resizedImage, `covers/${Date.now()}`);
-        setCoverImage(resizedImage);
         setCoverImageURL(imageURL);
       } catch (error) {
         alert(error);
@@ -246,7 +244,7 @@ const CreatePost = ({ isAuth }) => {
           {coverImageURL && (
             <div className="mt-2">
               <img src={coverImageURL} alt="Cover" className="max-w-xs rounded shadow" />
-              <button onClick={() => { setCoverImage(null); setCoverImageURL(""); }} className="mt-2 text-red-500">Delete Cover Image</button>
+              <button onClick={() => { setCoverImageURL(""); }} className="mt-2 text-red-500">Delete Cover Image</button>
               <button onClick={() => downloadImage(coverImageURL, "cover_image.jpg")} className="ml-4 text-blue-500">Download Cover Image</button>
             </div>
           )}
