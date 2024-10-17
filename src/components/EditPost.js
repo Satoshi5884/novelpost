@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth, getAIAssistUsage, updateAIAssistUsage } from '../firebase';
 import DOMPurify from 'dompurify';
 import { validateAndResizeImage, uploadImage, deleteImage, downloadImage } from '../utils/imageUtils';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -39,6 +39,17 @@ const EditPost = ({ isAuth }) => {
   const [previewMode, setPreviewMode] = useState(false);
   const [synopsis, setSynopsis] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [aiAssistUsage, setAIAssistUsage] = useState(0);
+
+  useEffect(() => {
+    const fetchAIAssistUsage = async () => {
+      if (auth.currentUser) {
+        const usage = await getAIAssistUsage(auth.currentUser.uid);
+        setAIAssistUsage(usage);
+      }
+    };
+    fetchAIAssistUsage();
+  }, []);
 
   const fetchPost = useCallback(async () => {
     if (!id) {
@@ -276,6 +287,10 @@ const EditPost = ({ isAuth }) => {
   };
 
   const generateAIContent = async () => {
+    if (aiAssistUsage >= 100) {
+      alert('AI Assist使用回数の上限に達しました。明日また使用できます。');
+      return;
+    }
     setIsGenerating(true);
     try {
       const prompt = `Title: ${title}\nPage Title: ${pages[currentPage].title}\nCurrent Content: ${pages[currentPage].content}\n\nContinue the story in about 5000 characters:`;
@@ -292,6 +307,9 @@ const EditPost = ({ isAuth }) => {
 
       const generatedContent = response.data.content;
       updatePageContent(pages[currentPage].content + '\n\n' + generatedContent);
+
+      await updateAIAssistUsage(auth.currentUser.uid);
+      setAIAssistUsage(prevUsage => prevUsage + 1);
     } catch (error) {
       console.error('AI content generation error:', error.response ? error.response.data : error.message);
       alert('Failed to generate AI content. Please check the console.');
@@ -368,17 +386,13 @@ const EditPost = ({ isAuth }) => {
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
             />
             <button
-              type="button"
               onClick={generateAIContent}
-              disabled={isGenerating}
-              className="ml-2 px-3 py-2 bg-secondary text-white rounded-md hover:bg-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary text-xs whitespace-nowrap relative group"
+              disabled={isGenerating || aiAssistUsage >= 100}
+              className={`ml-2 px-3 py-2 ${aiAssistUsage >= 100 ? 'bg-gray-400 cursor-not-allowed' : 'bg-secondary hover:bg-primary'} text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary text-xs whitespace-nowrap relative group`}
               title="AI Assist"
             >
               <FontAwesomeIcon icon={faCloudBolt} className="mr-1" />
               {isGenerating ? 'Gen...' : 'AI'}
-              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                AI Assist
-              </span>
             </button>
           </div>
         </div>

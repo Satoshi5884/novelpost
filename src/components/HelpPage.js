@@ -30,6 +30,18 @@ const HelpPage = () => {
         title: "使用例",
         intro: "これらのタグを使用して小説を書く例を以下に示します：",
       },
+      aiAssist: {
+        title: "AI Assistの使用方法",
+        intro: "NovelPostには、AI Assistという機能が搭載されています。この機能を使用すると、AIが物語の続きを生成し、執筆のアイデアを提供します。",
+        steps: [
+          "新規投稿作成画面または編集画面で、ページタイトルの入力欄の横にある「AI」ボタンをクリックします。",
+          "AIが現在のコンテンツを分析し、約5000文字の続きを生成します。",
+          "生成されたコンテンツは自動的にテキストエリアに追加されます。",
+          "必要に応じて、生成されたコンテンツを編集または削除できます。",
+        ],
+        usage: "AI Assistは1日に100回まで使用できます。使用可能回数は毎日リセットされます。",
+        warning: "注意: AI Assistは創作のサポートツールです。生成されたコンテンツは必ず確認し、必要に応じて編集してください。著作権や倫理的な問題がないか常に注意を払ってください。",
+      },
       needMoreHelp: {
         title: "さらにヘルプが必要ですか？",
         content: "ご質問がある場合や更なるサポートが必要な場合は、お気軽にサポートチームまでお問い合わせください。"
@@ -61,6 +73,18 @@ const HelpPage = () => {
       exampleUsage: {
         title: "Example Usage",
         intro: "Here's an example of how you might use these tags in your novel:",
+      },
+      aiAssist: {
+        title: "How to Use AI Assist",
+        intro: "NovelPost features an AI Assist function. This feature allows AI to generate story continuations and provide writing ideas.",
+        steps: [
+          "Click the 'AI' button next to the page title input field on the new post creation or edit screen.",
+          "The AI will analyze the current content and generate about 5000 characters of continuation.",
+          "The generated content will be automatically added to the text area.",
+          "You can edit or delete the generated content as needed.",
+        ],
+        usage: "AI Assist can be used up to 100 times per day. The usage count resets daily.",
+        warning: "Note: AI Assist is a creative support tool. Always review and edit the generated content as necessary. Be mindful of potential copyright or ethical issues.",
       },
       needMoreHelp: {
         title: "Need More Help?",
@@ -139,6 +163,18 @@ const HelpPage = () => {
 </ul>`}
           </code>
         </pre>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-2xl font-bold mb-4">{currentContent.aiAssist.title}</h2>
+        <p>{currentContent.aiAssist.intro}</p>
+        <ol className="list-decimal list-inside mt-4">
+          {currentContent.aiAssist.steps.map((step, index) => (
+            <li key={index} className="mb-2">{step}</li>
+          ))}
+        </ol>
+        <p className="mt-4">{currentContent.aiAssist.usage}</p>
+        <p className="mt-4 text-red-500">{currentContent.aiAssist.warning}</p>
       </section>
 
       <section>

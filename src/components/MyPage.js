@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { auth, db, setUserAuthorName, getUserAuthorName } from '../firebase';
+import { auth, db, setUserAuthorName, getUserAuthorName, getAIAssistUsage } from '../firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, writeBatch, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import FullPostView from './FullPostView';
@@ -12,6 +12,7 @@ const MyPage = ({ isAuth }) => {
   const [loading, setLoading] = useState(true);
   const [deletingPostId, setDeletingPostId] = useState(null);
   const [userEmail, setUserEmail] = useState("");
+  const [aiAssistUsage, setAIAssistUsage] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,6 +40,16 @@ const MyPage = ({ isAuth }) => {
 
     checkAuthAndFetchPosts();
   }, [isAuth, navigate]);
+
+  useEffect(() => {
+    const fetchAIAssistUsage = async () => {
+      if (auth.currentUser) {
+        const usage = await getAIAssistUsage(auth.currentUser.uid);
+        setAIAssistUsage(usage);
+      }
+    };
+    fetchAIAssistUsage();
+  }, []);
 
   const getPosts = async (userId) => {
     try {
@@ -170,6 +181,11 @@ const MyPage = ({ isAuth }) => {
             </button>
           </div>
         )}
+      </div>
+
+      {/* AI Assist usage display */}
+      <div className="mb-4">
+        <p className="text-gray-600">本日のAI Assist残り使用回数: {100 - aiAssistUsage}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

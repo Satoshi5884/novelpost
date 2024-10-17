@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, increment } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getStorage } from 'firebase/storage';
 
@@ -28,6 +28,32 @@ const getUserAuthorName = async (userId) => {
 // setUserAuthorName 関数の実装
 const setUserAuthorName = async (userId, authorName) => {
   await setDoc(doc(db, "users", userId), { authorName }, { merge: true });
+};
+
+// AI Assist使用回数を取得する関数
+export const getAIAssistUsage = async (userId) => {
+  const userDoc = await getDoc(doc(db, 'users', userId));
+  if (userDoc.exists()) {
+    const data = userDoc.data();
+    const lastUsageDate = data.lastAIAssistUsageDate?.toDate();
+    const today = new Date();
+    if (lastUsageDate && lastUsageDate.toDateString() === today.toDateString()) {
+      return data.aiAssistUsageCount || 0;
+    }
+  }
+  return 0;
+};
+
+// AI Assist使用回数を更新する関数
+export const updateAIAssistUsage = async (userId) => {
+  const userRef = doc(db, 'users', userId);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  await setDoc(userRef, {
+    aiAssistUsageCount: increment(1),
+    lastAIAssistUsageDate: today
+  }, { merge: true });
 };
 
 export { db, auth, provider, storage, getUserAuthorName, setUserAuthorName };
