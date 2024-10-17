@@ -168,7 +168,7 @@ const CreatePost = ({ isAuth }) => {
       const prompt = `タイトル: ${title}\nページタイトル: ${pages[currentPage].title}\n現在の内容: ${pages[currentPage].content}\n\n約5000文字で物語を続けてください:`;
 
       const response = await axios.post(
-        '/api/generate-ai-content',
+        '/.netlify/functions/generate-ai-content',
         { prompt },
         {
           headers: {

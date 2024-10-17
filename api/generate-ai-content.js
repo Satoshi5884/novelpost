@@ -1,12 +1,11 @@
 const axios = require('axios');
 
-module.exports = async (req, res) => {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
+exports.handler = async (event, context) => {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
-  const { prompt } = req.body;
+  const { prompt } = JSON.parse(event.body);
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
   try {
@@ -23,13 +22,18 @@ module.exports = async (req, res) => {
     );
 
     const generatedContent = response.data.candidates[0].content.parts[0].text;
-    res.status(200).json({ content: generatedContent });
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ content: generatedContent })
+    };
   } catch (error) {
     console.error('AIコンテンツ生成エラー:', error);
-    res.status(500).json({ 
-      error: 'AIコンテンツの生成に失敗しました',
-      details: error.message,
-      stack: error.stack
-    });
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ 
+        error: 'AIコンテンツの生成に失敗しました',
+        details: error.message
+      })
+    };
   }
 };
